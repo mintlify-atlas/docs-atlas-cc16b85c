@@ -1,0 +1,190 @@
+---
+title: Subscription Trials
+description: Learn how to offer trial periods to your customers with or without collecting payment information upfront
+---
+
+Laravel Cashier Paystack supports two types of trial periods: trials with billing information collected upfront, and generic trials without payment details.
+
+## Trial Periods With Billing Upfront
+
+If you want to offer trial periods while still collecting payment method information from the start, use the `trialDays` method when creating subscriptions.
+
+<Steps>
+  <Step title="Create a subscription with trial">
+    Use the `trialDays` method to specify the number of trial days:
+
+    ```php
+    $user = User::find(1);
+
+    $user->newSubscription('default', 'PLN_gx2wn530m0i3w3m')
+        ->trialDays(10)
+        ->create($auth_token);
+    ```
+
+    This sets the trial period ending date in the database and instructs Paystack not to bill the customer until after this date.
+  </Step>
+
+  <Step title="Notify users before trial ends">
+    Customers will be charged automatically when the trial expires, so make sure to notify them beforehand.
+
+    <Warning>
+      If the customer's subscription is not cancelled before the trial ending date, they will be charged as soon as the trial expires.
+    </Warning>
+  </Step>
+</Steps>
+
+### Checking Trial Status
+
+You can determine if a user is within their trial period using the `onTrial` method on either the user instance or the subscription instance:
+
+```php
+// Check on the user instance
+if ($user->onTrial('default')) {
+    // User is on trial for the 'default' subscription
+}
+
+// Check on the subscription instance
+if ($user->subscription('default')->onTrial()) {
+    // User is on trial
+}
+```
+
+<Note>
+  The two examples above are functionally identical - use whichever feels more natural in your code.
+</Note>
+
+### Checking for Expired Trials
+
+To determine if a user's trial has expired, use the `hasExpiredTrial` method:
+
+```php
+if ($user->hasExpiredTrial('default')) {
+    // The user's trial has ended
+}
+
+// Check for a specific plan
+if ($user->hasExpiredTrial('default', 'PLN_gx2wn530m0i3w3m')) {
+    // Trial expired for specific plan
+}
+```
+
+## Trial Periods Without Billing Upfront
+
+If you want to offer trial periods without collecting payment information upfront, set the `trial_ends_at` column on the customer record. This is typically done during user registration.
+
+<Steps>
+  <Step title="Set trial end date during registration">
+    ```php
+    use veekthoven\Cashier\Customer;
+
+    $user = Customer::create([
+        // Populate other user properties...
+        'billable_id' => $user->getKey(),
+        'billable_type' => $user->getMorphClass(),
+        'trial_ends_at' => now()->addDays(10),
+    ]);
+    ```
+
+    <Note>
+      Be sure to add a date mutator for `trial_ends_at` to your model definition.
+    </Note>
+  </Step>
+
+  <Step title="Check generic trial status">
+    The `onTrial` method returns `true` if the current date hasn't passed the `trial_ends_at` value:
+
+    ```php
+    if ($user->onTrial()) {
+        // User is within their trial period
+    }
+    ```
+  </Step>
+
+  <Step title="Distinguish generic trials">
+    Use the `onGenericTrial` method to specifically check if the user is on a generic trial and hasn't created a subscription yet:
+
+    ```php
+    if ($user->onGenericTrial()) {
+        // User is within their "generic" trial period
+        // and has not created an actual subscription yet
+    }
+    ```
+  </Step>
+
+  <Step title="Create subscription after trial">
+    When ready to create an actual subscription, use the `newSubscription` method as usual:
+
+    ```php
+    $user = User::find(1);
+    $plan_code = 'PLN_gx2wn530m0i3w3m';
+
+    // With Paystack card auth token
+    $user->newSubscription('default', $plan_code)->create($auth_token);
+
+    // Or use the customer's most recent authorization
+    $user->newSubscription('default', $plan_code)->create();
+    ```
+  </Step>
+</Steps>
+
+## Trial Period Implementation
+
+Cashier refers to trials without subscriptions as "generic trials" since they're not attached to any existing subscription. Here's how the implementation works internally:
+
+<Accordion title="View SubscriptionBuilder source code">
+  ```php
+  // From src/SubscriptionBuilder.php
+  public function trialDays($trialDays)
+  {
+      $this->trialDays = $trialDays;
+      return $this;
+  }
+
+  public function save(array $options = [])
+  {
+      if ($this->skipTrial) {
+          $trialEndsAt = null;
+      } else {
+          $trialEndsAt = $this->trialDays 
+              ? Carbon::now()->addDays($this->trialDays) 
+              : null;
+      }
+
+      return $this->billable->subscriptions()->create([
+          'type' => $this->type,
+          'paystack_id' => $options['id'],
+          'paystack_code' => $options['subscription_code'],
+          'paystack_plan' => $this->plan,
+          'quantity' => 1,
+          'trial_ends_at' => $trialEndsAt,
+          'ends_at' => null,
+      ]);
+  }
+  ```
+</Accordion>
+
+## Getting Trial End Date
+
+You can retrieve the trial ending date using the `trialEndsAt` method:
+
+```php
+$trialEndsAt = $user->trialEndsAt('default');
+
+if ($trialEndsAt) {
+    echo "Your trial ends on: " . $trialEndsAt->toFormattedDateString();
+}
+```
+
+## Skipping Trials
+
+If you need to create a subscription without a trial period, use the `skipTrial` method:
+
+```php
+$user->newSubscription('default', 'PLN_gx2wn530m0i3w3m')
+    ->skipTrial()
+    ->create($auth_token);
+```
+
+<Warning>
+  When using `skipTrial()`, the customer will be charged immediately upon subscription creation.
+</Warning>

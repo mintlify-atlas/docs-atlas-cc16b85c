@@ -1,0 +1,462 @@
+---
+title: 'Subscription'
+description: 'API reference for the Subscription model'
+---
+
+The `Subscription` model represents a customer's subscription to a plan in Laravel Cashier Paystack.
+
+## Properties
+
+### `paystack_id`
+
+The Paystack subscription ID.
+
+### `paystack_code`
+
+The Paystack subscription code.
+
+### `paystack_plan`
+
+The Paystack plan code this subscription is for.
+
+### `type`
+
+The subscription type (e.g., `default`).
+
+### `quantity`
+
+The subscription quantity.
+
+### `trial_ends_at`
+
+The date and time when the trial period ends.
+
+### `ends_at`
+
+The date and time when the subscription ends (cancellation date).
+
+### `created_at`
+
+The date and time when the subscription was created.
+
+### `updated_at`
+
+The date and time when the subscription was last updated.
+
+## Constants
+
+### `DEFAULT_TYPE`
+
+The default subscription type.
+
+```php
+const DEFAULT_TYPE = 'default';
+```
+
+## Relationships
+
+### `billable()`
+
+Get the billable model related to the subscription.
+
+```php
+public function billable(): MorphTo
+```
+
+**Example:**
+
+```php
+$subscription = Subscription::find(1);
+$user = $subscription->billable;
+```
+
+### `user()`
+
+Alias for `billable()`. Get the user that owns the subscription.
+
+```php
+public function user()
+```
+
+**Example:**
+
+```php
+$subscription = Subscription::find(1);
+$user = $subscription->user();
+```
+
+## State Methods
+
+### `valid()`
+
+Determine if the subscription is active, on trial, or within its grace period.
+
+```php
+public function valid(): bool
+```
+
+**Example:**
+
+```php
+if ($subscription->valid()) {
+    // Subscription is valid
+}
+```
+
+### `active()`
+
+Determine if the subscription is active.
+
+```php
+public function active(): bool
+```
+
+**Example:**
+
+```php
+if ($subscription->active()) {
+    // Subscription is active
+}
+```
+
+### `recurring()`
+
+Determine if the subscription is recurring and not on trial.
+
+```php
+public function recurring(): bool
+```
+
+**Example:**
+
+```php
+if ($subscription->recurring()) {
+    // Subscription is recurring
+}
+```
+
+### `cancelled()`
+
+Determine if the subscription is no longer active.
+
+```php
+public function cancelled(): bool
+```
+
+**Example:**
+
+```php
+if ($subscription->cancelled()) {
+    // Subscription has been cancelled
+}
+```
+
+### `ended()`
+
+Determine if the subscription has ended and the grace period has expired.
+
+```php
+public function ended(): bool
+```
+
+**Example:**
+
+```php
+if ($subscription->ended()) {
+    // Subscription has completely ended
+}
+```
+
+### `onTrial()`
+
+Determine if the subscription is within its trial period.
+
+```php
+public function onTrial(): bool
+```
+
+**Example:**
+
+```php
+if ($subscription->onTrial()) {
+    // Subscription is on trial
+}
+```
+
+### `onGracePeriod()`
+
+Determine if the subscription is within its grace period after cancellation.
+
+```php
+public function onGracePeriod(): bool
+```
+
+**Example:**
+
+```php
+if ($subscription->onGracePeriod()) {
+    // Subscription is in grace period
+}
+```
+
+### `hasPlan()`
+
+Determine if the subscription is on a specific plan.
+
+```php
+public function hasPlan(string $planId): bool
+```
+
+**Parameters:**
+
+- `$planId` (string): The plan ID to check
+
+**Example:**
+
+```php
+if ($subscription->hasPlan('PLN_basic')) {
+    // User is on the basic plan
+}
+```
+
+## Query Scopes
+
+### `scopeActive()`
+
+Filter query to only include active subscriptions.
+
+```php
+public function scopeActive($query): void
+```
+
+**Example:**
+
+```php
+$activeSubscriptions = Subscription::active()->get();
+```
+
+### `scopeRecurring()`
+
+Filter query to only include recurring subscriptions.
+
+```php
+public function scopeRecurring($query): void
+```
+
+**Example:**
+
+```php
+$recurringSubscriptions = Subscription::recurring()->get();
+```
+
+### `scopeCancelled()`
+
+Filter query to only include cancelled subscriptions.
+
+```php
+public function scopeCancelled($query): void
+```
+
+**Example:**
+
+```php
+$cancelledSubscriptions = Subscription::cancelled()->get();
+```
+
+### `scopeNotCancelled()`
+
+Filter query to only include non-cancelled subscriptions.
+
+```php
+public function scopeNotCancelled($query): void
+```
+
+**Example:**
+
+```php
+$activeSubscriptions = Subscription::notCancelled()->get();
+```
+
+### `scopeEnded()`
+
+Filter query to only include ended subscriptions.
+
+```php
+public function scopeEnded($query): void
+```
+
+**Example:**
+
+```php
+$endedSubscriptions = Subscription::ended()->get();
+```
+
+### `scopeOnTrial()`
+
+Filter query to only include subscriptions on trial.
+
+```php
+public function scopeOnTrial($query): void
+```
+
+**Example:**
+
+```php
+$trialSubscriptions = Subscription::onTrial()->get();
+```
+
+### `scopeNotOnTrial()`
+
+Filter query to only include subscriptions not on trial.
+
+```php
+public function scopeNotOnTrial($query): void
+```
+
+**Example:**
+
+```php
+$paidSubscriptions = Subscription::notOnTrial()->get();
+```
+
+### `scopeOnGracePeriod()`
+
+Filter query to only include subscriptions on grace period.
+
+```php
+public function scopeOnGracePeriod($query): void
+```
+
+**Example:**
+
+```php
+$gracePeriodSubscriptions = Subscription::onGracePeriod()->get();
+```
+
+### `scopeNotOnGracePeriod()`
+
+Filter query to only include subscriptions not on grace period.
+
+```php
+public function scopeNotOnGracePeriod($query): void
+```
+
+**Example:**
+
+```php
+$activeSubscriptions = Subscription::notOnGracePeriod()->get();
+```
+
+## Modification Methods
+
+### `cancel()`
+
+Cancel the subscription at the end of the billing period.
+
+```php
+public function cancel(): self
+```
+
+**Example:**
+
+```php
+$subscription->cancel();
+```
+
+### `cancelNow()`
+
+Cancel the subscription immediately.
+
+```php
+public function cancelNow(): self
+```
+
+**Example:**
+
+```php
+$subscription->cancelNow();
+```
+
+### `markAsCancelled()`
+
+Mark the subscription as cancelled.
+
+```php
+public function markAsCancelled(): void
+```
+
+**Example:**
+
+```php
+$subscription->markAsCancelled();
+```
+
+### `resume()`
+
+Resume the cancelled subscription.
+
+```php
+public function resume(): self
+```
+
+**Throws:** `LogicException`
+
+**Example:**
+
+```php
+$subscription->resume();
+```
+
+### `swap()`
+
+Swap the subscription to a new plan.
+
+```php
+public function swap(string $plan, array $attributes = []): self
+```
+
+**Parameters:**
+
+- `$plan` (string): The new plan code
+- `$attributes` (array): Additional attributes for the new subscription
+
+**Example:**
+
+```php
+$subscription->swap('PLN_premium', [
+    'start_date' => now()->addDays(7)->format('c'),
+]);
+```
+
+### `skipTrial()`
+
+Force the trial to end immediately. This method must be combined with swap, resume, etc.
+
+```php
+public function skipTrial(): self
+```
+
+**Example:**
+
+```php
+$subscription->skipTrial()->resume();
+```
+
+## Paystack Integration
+
+### `asPaystackSubscription()`
+
+Get the subscription as a Paystack subscription object.
+
+```php
+public function asPaystackSubscription(): array
+```
+
+**Throws:** `Exception` if subscription not found
+
+**Example:**
+
+```php
+$paystackSubscription = $subscription->asPaystackSubscription();
+echo $paystackSubscription['status'];
+```

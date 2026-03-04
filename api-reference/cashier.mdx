@@ -1,0 +1,302 @@
+---
+title: 'Cashier'
+description: 'API reference for the Cashier utility class'
+---
+
+The `Cashier` class provides utility methods for configuring Laravel Cashier Paystack.
+
+## Properties
+
+### `$runsMigrations`
+
+Indicates if migrations will be run.
+
+```php
+public static bool $runsMigrations = true;
+```
+
+**Example:**
+
+```php
+Cashier::$runsMigrations = false;
+```
+
+### `$registersRoutes`
+
+Indicates if routes will be registered.
+
+```php
+public static bool $registersRoutes = true;
+```
+
+**Example:**
+
+```php
+Cashier::$registersRoutes = false;
+```
+
+### `$customerModel`
+
+The customer model class name.
+
+```php
+public static string $customerModel = Customer::class;
+```
+
+### `$subscriptionModel`
+
+The subscription model class name.
+
+```php
+public static string $subscriptionModel = Subscription::class;
+```
+
+## Currency Methods
+
+### `useCurrency()`
+
+Set the currency to be used when billing models.
+
+```php
+public static function useCurrency(string $currency, string $symbol = null): void
+```
+
+**Parameters:**
+
+- `$currency` (string): The currency code (e.g., 'NGN', 'GHS', 'USD')
+- `$symbol` (string|null): The currency symbol (optional)
+
+**Throws:** `Exception` if unable to guess symbol and none is provided
+
+**Example:**
+
+```php
+Cashier::useCurrency('ngn');
+
+// With custom symbol
+Cashier::useCurrency('usd', '$');
+```
+
+### `usesCurrency()`
+
+Get the currency currently in use.
+
+```php
+public static function usesCurrency(): string
+```
+
+**Example:**
+
+```php
+$currency = Cashier::usesCurrency(); // 'NGN'
+```
+
+### `useCurrencySymbol()`
+
+Set the currency symbol to be used when formatting currency.
+
+```php
+public static function useCurrencySymbol(string $symbol): void
+```
+
+**Parameters:**
+
+- `$symbol` (string): The currency symbol
+
+**Example:**
+
+```php
+Cashier::useCurrencySymbol('₦');
+```
+
+### `usesCurrencySymbol()`
+
+Get the currency symbol currently in use.
+
+```php
+public static function usesCurrencySymbol(): string
+```
+
+**Example:**
+
+```php
+$symbol = Cashier::usesCurrencySymbol(); // '₦'
+```
+
+## Formatting Methods
+
+### `formatAmount()`
+
+Format the given amount into a displayable currency.
+
+```php
+public static function formatAmount(int $amount): string
+```
+
+**Parameters:**
+
+- `$amount` (int): The amount in kobo (smallest currency unit)
+
+**Example:**
+
+```php
+echo Cashier::formatAmount(1000000); // ₦10,000.00
+echo Cashier::formatAmount(500000);  // ₦5,000.00
+echo Cashier::formatAmount(-200000); // -₦2,000.00
+```
+
+### `formatCurrencyUsing()`
+
+Set a custom currency formatter.
+
+```php
+public static function formatCurrencyUsing(callable $callback): void
+```
+
+**Parameters:**
+
+- `$callback` (callable): The formatter callback function
+
+**Example:**
+
+```php
+Cashier::formatCurrencyUsing(function ($amount) {
+    return 'NGN ' . number_format($amount / 100, 2);
+});
+
+echo Cashier::formatAmount(1000000); // NGN 10000.00
+```
+
+## Model Configuration Methods
+
+### `useCustomerModel()`
+
+Set the customer model class name.
+
+```php
+public static function useCustomerModel(string $customerModel): void
+```
+
+**Parameters:**
+
+- `$customerModel` (string): The customer model class name
+
+**Example:**
+
+```php
+use App\Models\PaystackCustomer;
+
+Cashier::useCustomerModel(PaystackCustomer::class);
+```
+
+### `useSubscriptionModel()`
+
+Set the subscription model class name.
+
+```php
+public static function useSubscriptionModel(string $subscriptionModel): void
+```
+
+**Parameters:**
+
+- `$subscriptionModel` (string): The subscription model class name
+
+**Example:**
+
+```php
+use App\Models\PaystackSubscription;
+
+Cashier::useSubscriptionModel(PaystackSubscription::class);
+```
+
+## Supported Currencies
+
+The `useCurrency()` method automatically guesses currency symbols for the following currencies:
+
+- **NGN** (Nigerian Naira): ₦
+- **GHS** (Ghanaian Cedi): GH₵
+- **EUR** (Euro): €
+- **GBP** (British Pound): £
+- **USD** (US Dollar): $
+- **AUD** (Australian Dollar): $
+- **CAD** (Canadian Dollar): $
+
+## Usage Examples
+
+### Configuring Currency
+
+```php
+use veekthoven\Cashier\Cashier;
+
+// In your service provider's boot method
+public function boot()
+{
+    Cashier::useCurrency('usd', '$');
+}
+```
+
+### Custom Amount Formatting
+
+```php
+Cashier::formatCurrencyUsing(function ($amount) {
+    $formatted = number_format($amount / 100, 2, '.', ',');
+    return Cashier::usesCurrencySymbol() . $formatted;
+});
+
+// Now all amounts will use your custom formatting
+echo Cashier::formatAmount(1234567); // ₦12,345.67
+```
+
+### Disabling Migrations
+
+```php
+// In your AppServiceProvider's register method
+use veekthoven\Cashier\Cashier;
+
+public function register()
+{
+    Cashier::$runsMigrations = false;
+}
+```
+
+### Disabling Routes
+
+```php
+// In your AppServiceProvider's register method
+use veekthoven\Cashier\Cashier;
+
+public function register()
+{
+    Cashier::$registersRoutes = false;
+}
+```
+
+### Using Custom Models
+
+```php
+use App\Models\CustomCustomer;
+use App\Models\CustomSubscription;
+use veekthoven\Cashier\Cashier;
+
+public function boot()
+{
+    Cashier::useCustomerModel(CustomCustomer::class);
+    Cashier::useSubscriptionModel(CustomSubscription::class);
+}
+```
+
+### Multiple Currency Support
+
+```php
+// Set currency based on user location
+if ($user->country === 'NG') {
+    Cashier::useCurrency('ngn');
+} elseif ($user->country === 'GH') {
+    Cashier::useCurrency('ghs');
+} else {
+    Cashier::useCurrency('usd', '$');
+}
+
+// Display formatted amounts
+echo Cashier::formatAmount($invoice->rawTotal());
+```

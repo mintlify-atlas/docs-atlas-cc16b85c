@@ -1,97 +1,218 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: Laravel Cashier Paystack Documentation
+description: An expressive, fluent interface to Paystack's subscription billing services for Laravel applications
+mode: custom
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#00C3F7] via-[#0099CC] to-[#006699] dark:from-[#006699] dark:via-[#0099CC] dark:to-[#00C3F7] py-20">
+  <div className="absolute inset-0 bg-black/20 dark:bg-black/40"></div>
+  <div className="relative max-w-6xl mx-auto px-6 lg:px-8">
+    <div className="lg:grid lg:grid-cols-12 lg:gap-8 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+          Laravel Cashier Paystack
+        </h1>
+        <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-2xl">
+          Handle subscription billing with Paystack in your Laravel applications. Manage subscriptions, invoices, payments, and webhooks with an expressive, fluent interface.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a 
+            href="/installation" 
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-[#00C3F7] font-semibold hover:bg-gray-100 transition-colors no-underline"
+          >
+            Get Started
+          </a>
+          <a 
+            href="/api-reference/billable-trait" 
+            className="inline-flex items-center px-6 py-3 rounded-lg border-2 border-white/30 bg-white/10 text-white font-semibold hover:bg-white/20 transition-colors no-underline"
+          >
+            API Reference
+          </a>
+        </div>
+      </div>
+      <div className="hidden lg:block lg:col-span-5">
+        <div className="bg-white/10 dark:bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+          ```php
+          use veekthoven\Cashier\Billable;
 
-Get your documentation site up and running in minutes.
+          class User extends Authenticatable
+          {
+              use Billable;
+          }
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+          // Create a subscription
+          $user->newSubscription('default', 'plan_code')
+              ->create($authToken);
 
-## Make it yours
+          // Check subscription status
+          if ($user->subscribed('default')) {
+              // User is subscribed
+          }
+          ```
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Design a docs site that looks great and empowers your users.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+    Quick start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get Laravel Cashier Paystack integrated into your application in minutes
+  </p>
+  
+  <Steps>
+    <Step title="Install the package">
+      Install Laravel Cashier Paystack via Composer:
+      
+      ```bash
+      composer require veekthoven/laravel-cashier-paystack
+      ```
+    </Step>
+    
+    <Step title="Publish configuration and migrations">
+      Publish the configuration file and run migrations:
+      
+      ```bash
+      php artisan vendor:publish --provider="veekthoven\Cashier\CashierServiceProvider"
+      php artisan migrate
+      ```
+    </Step>
+    
+    <Step title="Configure your Paystack keys">
+      Add your Paystack API keys to your `.env` file:
+      
+      ```bash
+      PAYSTACK_PUBLIC_KEY=pk_test_xxxxxxxxxxxxx
+      PAYSTACK_SECRET_KEY=sk_test_xxxxxxxxxxxxx
+      ```
+    </Step>
+    
+    <Step title="Add the Billable trait">
+      Add the `Billable` trait to your user model:
+      
+      ```php
+      use veekthoven\Cashier\Billable;
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+      class User extends Authenticatable
+      {
+          use Billable;
+      }
+      ```
+      
+      You're ready to start managing subscriptions!
+    </Step>
+  </Steps>
+</div>
 
-## Create beautiful pages
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+    Core features
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Everything you need for subscription billing with Paystack
+  </p>
+  
+  <CardGroup cols={2}>
+    <Card title="Subscription management" icon="repeat" href="/core-concepts/subscriptions">
+      Create, cancel, resume, and swap subscription plans with ease
+    </Card>
+    <Card title="Payment methods" icon="credit-card" href="/guides/payment-methods">
+      Store and manage customer payment methods securely
+    </Card>
+    <Card title="Invoices & receipts" icon="file-invoice" href="/core-concepts/invoices">
+      Generate invoices and PDF receipts automatically
+    </Card>
+    <Card title="Webhook handling" icon="webhook" href="/guides/webhooks">
+      Process Paystack webhooks for subscription events
+    </Card>
+    <Card title="Trial periods" icon="clock" href="/guides/subscription-trials">
+      Support trial periods with or without payment information
+    </Card>
+    <Card title="Single charges" icon="bolt" href="/guides/single-charges">
+      Make one-time charges outside of subscriptions
+    </Card>
+  </CardGroup>
+</div>
 
-Everything you need to create world-class documentation.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+    Explore the API
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Comprehensive reference for all traits, models, and classes
+  </p>
+  
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <a href="/api-reference/billable-trait" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#00C3F7] dark:hover:border-[#00C3F7] overflow-hidden transition-colors no-underline">
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">Billable Trait</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">The main trait that adds billing capabilities to your models</p>
+        <div className="flex items-center text-sm font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#00C3F7] dark:group-hover:text-[#00C3F7]">
+          View reference
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+    
+    <a href="/api-reference/subscription" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#00C3F7] dark:hover:border-[#00C3F7] overflow-hidden transition-colors no-underline">
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">Subscription Model</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Manage subscription lifecycle, trials, and grace periods</p>
+        <div className="flex items-center text-sm font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#00C3F7] dark:group-hover:text-[#00C3F7]">
+          View reference
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+    
+    <a href="/api-reference/invoice" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#00C3F7] dark:hover:border-[#00C3F7] overflow-hidden transition-colors no-underline">
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">Invoice Model</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Generate, verify, and manage invoices with PDF support</p>
+        <div className="flex items-center text-sm font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#00C3F7] dark:group-hover:text-[#00C3F7]">
+          View reference
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+    
+    <a href="/api-reference/events" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#00C3F7] dark:hover:border-[#00C3F7] overflow-hidden transition-colors no-underline">
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">Events</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Listen for subscription, payment, and webhook events</p>
+        <div className="flex items-center text-sm font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#00C3F7] dark:group-hover:text-[#00C3F7]">
+          View reference
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl border border-gray-200 dark:border-[#27272a] bg-gradient-to-br from-gray-50 to-white dark:from-[#1a1d27] dark:to-[#0f1117] p-8">
+    <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">
+      Ready to integrate Paystack billing?
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-6">
+      Follow our installation guide to add Laravel Cashier Paystack to your application
+    </p>
+    <a 
+      href="/installation" 
+      className="inline-flex items-center px-6 py-3 rounded-lg bg-[#00C3F7] text-white font-semibold hover:bg-[#009FCC] transition-colors no-underline"
+    >
+      Get started
+    </a>
+  </div>
+</div>

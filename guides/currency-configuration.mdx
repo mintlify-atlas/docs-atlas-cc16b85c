@@ -1,0 +1,362 @@
+---
+title: Currency Configuration
+description: Configure and manage multi-currency support in Laravel Cashier Paystack
+---
+
+Laravel Cashier Paystack supports multiple currencies and provides flexible currency configuration options. The default currency is Nigerian Naira (NGN), but you can easily change it to support other currencies.
+
+## Default Currency
+
+By default, Cashier uses Nigerian Naira (NGN) with the ₦ symbol:
+
+```php
+// Default configuration in src/Cashier.php
+protected static $currency = 'NGN';
+protected static $currencySymbol = '₦';
+```
+
+## Changing the Currency
+
+To change the default currency, call the `Cashier::useCurrency` method in the `boot` method of a service provider.
+
+<Steps>
+  <Step title="Open your service provider">
+    Typically, you'll add this to `App\Providers\AppServiceProvider`:
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use Illuminate\Support\ServiceProvider;
+    use veekthoven\Cashier\Cashier;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot()
+        {
+            //
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Call useCurrency in the boot method">
+    The `useCurrency` method accepts two parameters: the currency code and the currency symbol.
+
+    ```php
+    public function boot()
+    {
+        Cashier::useCurrency('ghs', 'GH₵');
+    }
+    ```
+  </Step>
+</Steps>
+
+## Supported Currencies
+
+Cashier includes automatic currency symbol detection for common currencies:
+
+| Currency Code | Symbol | Currency Name |
+|---|---|---|
+| NGN | ₦ | Nigerian Naira |
+| GHS | GH₵ | Ghanaian Cedi |
+| USD | $ | US Dollar |
+| AUD | $ | Australian Dollar |
+| CAD | $ | Canadian Dollar |
+| EUR | € | Euro |
+| GBP | £ | British Pound |
+
+### Examples
+
+```php
+use veekthoven\Cashier\Cashier;
+
+// Nigerian Naira
+Cashier::useCurrency('ngn', '₦');
+
+// Ghanaian Cedi
+Cashier::useCurrency('ghs', 'GH₵');
+
+// US Dollar
+Cashier::useCurrency('usd', '$');
+
+// British Pound
+Cashier::useCurrency('gbp', '£');
+
+// Euro
+Cashier::useCurrency('eur', '€');
+```
+
+<Note>
+  Currency codes are case-insensitive. The `useCurrency` method automatically converts them to lowercase.
+</Note>
+
+## Automatic Symbol Detection
+
+If you don't provide a currency symbol, Cashier will attempt to guess it based on the currency code:
+
+```php
+// Symbol is automatically set to 'GH₵'
+Cashier::useCurrency('ghs');
+
+// Symbol is automatically set to '$'
+Cashier::useCurrency('usd');
+```
+
+<Accordion title="View automatic symbol detection implementation">
+  ```php
+  // From src/Cashier.php
+  protected static function guessCurrencySymbol($currency)
+  {
+      switch (strtolower($currency)) {
+          case 'ngn':
+              return '₦';
+          case 'ghs':
+              return 'GH₵';
+          case 'eur':
+              return '€';
+          case 'gbp':
+              return '£';
+          case 'usd':
+          case 'aud':
+          case 'cad':
+              return '$';
+          default:
+              throw new Exception('Unable to guess symbol for currency. Please explicitly specify it.');
+      }
+  }
+  ```
+</Accordion>
+
+<Warning>
+  If Cashier cannot guess the symbol for your currency, an exception will be thrown. Always provide the symbol explicitly for currencies not in the supported list.
+</Warning>
+
+## Custom Currency Symbols
+
+For currencies not in the supported list, you must explicitly provide the symbol:
+
+```php
+// South African Rand
+Cashier::useCurrency('zar', 'R');
+
+// Kenyan Shilling
+Cashier::useCurrency('kes', 'KSh');
+
+// Egyptian Pound
+Cashier::useCurrency('egp', 'E£');
+```
+
+## Retrieving Currency Information
+
+### Get Current Currency
+
+```php
+$currency = Cashier::usesCurrency();
+// Returns: "NGN" (always uppercase)
+```
+
+### Get Current Currency Symbol
+
+```php
+$symbol = Cashier::usesCurrencySymbol();
+// Returns: "₦"
+```
+
+### Get Customer's Preferred Currency
+
+```php
+$currency = $user->preferredCurrency();
+// Returns the configured currency for the customer
+```
+
+## Formatting Currency Amounts
+
+Cashier provides a `formatAmount` method to display amounts with the proper currency symbol:
+
+```php
+use veekthoven\Cashier\Cashier;
+
+// Amount in kobo (smallest unit)
+$amount = 125050; // ₦1,250.50
+
+$formatted = Cashier::formatAmount($amount);
+// Returns: "₦1,250.50"
+```
+
+### Handling Negative Amounts
+
+The `formatAmount` method properly handles negative values:
+
+```php
+$amount = -50000; // -₦500.00
+$formatted = Cashier::formatAmount($amount);
+// Returns: "-₦500.00"
+```
+
+<Accordion title="View formatAmount implementation">
+  ```php
+  // From src/Cashier.php
+  public static function formatAmount($amount)
+  {
+      if (static::$formatCurrencyUsing) {
+          return call_user_func(static::$formatCurrencyUsing, $amount);
+      }
+
+      $amount = number_format($amount / 100, 2);
+
+      if (Str::startsWith($amount, '-')) {
+          return '-'.static::usesCurrencySymbol().ltrim($amount, '-');
+      }
+
+      return static::usesCurrencySymbol().$amount;
+  }
+  ```
+</Accordion>
+
+## Custom Currency Formatting
+
+For advanced currency formatting needs, you can provide a custom formatter callback:
+
+```php
+use veekthoven\Cashier\Cashier;
+
+Cashier::formatCurrencyUsing(function ($amount) {
+    // Custom formatting logic
+    $formatted = number_format($amount / 100, 2);
+    return 'NGN ' . $formatted; // e.g., "NGN 1,250.50"
+});
+```
+
+This is useful for:
+- Locale-specific number formatting
+- Different symbol positioning
+- Custom decimal and thousand separators
+
+### Example: European Number Format
+
+```php
+Cashier::formatCurrencyUsing(function ($amount) {
+    $formatted = number_format($amount / 100, 2, ',', '.');
+    return '€' . $formatted; // e.g., "€1.250,50"
+});
+```
+
+## Currency in Charges and Invoices
+
+When making charges or creating invoices, the configured currency is automatically used:
+
+```php
+// The charge uses the configured currency
+$response = $user->charge(10000);
+
+// The invoice uses the configured currency
+$invoice = $user->invoiceFor('Service Fee', 50000, [
+    'due_date' => now()->addWeek(),
+]);
+```
+
+### Specifying Currency Per Charge
+
+You can override the default currency for individual charges:
+
+```php
+$response = $user->charge(10000, [
+    'currency' => 'USD',
+]);
+```
+
+<Warning>
+  Ensure the currency you specify is supported by Paystack for your account. Not all accounts support all currencies.
+</Warning>
+
+## Amount Precision
+
+All amounts in Cashier must be specified in the smallest currency unit:
+
+| Currency | Smallest Unit | Example |
+|---|---|---|
+| NGN | Kobo | ₦100.00 = 10000 kobo |
+| GHS | Pesewa | GH₵50.00 = 5000 pesewas |
+| USD | Cent | $25.00 = 2500 cents |
+| EUR | Cent | €10.00 = 1000 cents |
+| GBP | Pence | £15.00 = 1500 pence |
+
+### Converting to Smallest Unit
+
+```php
+// Convert ₦1,250.50 to kobo
+$naira = 1250.50;
+$kobo = $naira * 100; // 125050
+
+$response = $user->charge($kobo);
+```
+
+## Multi-Currency Applications
+
+For applications that need to support multiple currencies simultaneously, you can:
+
+1. **Store currency per customer** - Add a `currency` column to your customers table
+2. **Override `preferredCurrency` method** - Customize the billable trait
+3. **Set currency dynamically** - Change currency based on user settings
+
+### Example: Customer-Specific Currency
+
+```php
+// In your User model
+public function preferredCurrency()
+{
+    return $this->currency ?? Cashier::usesCurrency();
+}
+```
+
+## Complete Configuration Example
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use veekthoven\Cashier\Cashier;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot()
+    {
+        // Set default currency
+        Cashier::useCurrency('ghs', 'GH₵');
+        
+        // Custom currency formatting
+        Cashier::formatCurrencyUsing(function ($amount) {
+            $formatted = number_format($amount / 100, 2);
+            return Cashier::usesCurrencySymbol() . ' ' . $formatted;
+        });
+    }
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Set currency early">
+    Configure your currency in a service provider's `boot` method before any billing operations occur.
+  </Step>
+
+  <Step title="Be consistent">
+    Use the same currency throughout your application unless you specifically need multi-currency support.
+  </Step>
+
+  <Step title="Always use smallest units">
+    Never use decimal values for amounts. Always convert to the smallest currency unit (kobo, cents, etc.).
+  </Step>
+
+  <Step title="Verify Paystack support">
+    Check that your Paystack account supports the currencies you want to use.
+  </Step>
+
+  <Step title="Display formatted amounts">
+    Use `Cashier::formatAmount()` to display amounts to users for consistency.
+  </Step>
+</Steps>

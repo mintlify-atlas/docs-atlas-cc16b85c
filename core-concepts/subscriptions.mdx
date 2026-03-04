@@ -1,0 +1,348 @@
+---
+title: Subscriptions
+description: Create and manage recurring subscriptions with Paystack
+---
+
+## Introduction
+
+Subscriptions allow you to charge customers on a recurring basis. Laravel Cashier Paystack provides an expressive, fluent interface for managing subscription lifecycles.
+
+## Creating Subscriptions
+
+To create a subscription, use the `newSubscription` method on your billable model:
+
+```php
+$user = User::find(1);
+
+// With a card authorization token
+$user->newSubscription('default', 'PLN_gx2wn530m0i3w3m')
+    ->create($authToken);
+
+// Using customer's most recent authorization
+$user->newSubscription('default', 'PLN_gx2wn530m0i3w3m')
+    ->create();
+```
+
+The first argument is the subscription name (e.g., `default`, `main`, `premium`). The second argument is the Paystack plan code from your Paystack dashboard.
+
+### Initialize Payment
+
+To initialize a new charge for a subscription (returns authorization URL):
+
+```php
+$response = $user->newSubscription('default', 'PLN_gx2wn530m0i3w3m')
+    ->charge();
+
+// Redirect to authorization URL
+return redirect($response['data']['authorization_url']);
+```
+
+### Additional Customer Details
+
+Pass additional metadata as the second argument to `create`:
+
+```php
+$user->newSubscription('default', 'PLN_cgumntiwkkda3cw')
+    ->create($authToken, [
+        'metadata' => json_encode(['user_type' => 'premium']),
+    ]);
+```
+
+## Checking Subscription Status
+
+### Active Subscriptions
+
+Check if a user has an active subscription:
+
+```php
+if ($user->subscribed('default')) {
+    // User has an active subscription
+}
+```
+
+This method returns `true` even if the subscription is within its trial period or grace period after cancellation.
+
+### Subscription Status Methods
+
+The `Subscription` model provides several methods to check status:
+
+<CodeGroup>
+```php active()
+// Check if subscription is active
+if ($user->subscription('default')->active()) {
+    // Subscription is active
+}
+```
+
+```php cancelled()
+// Check if subscription is cancelled
+if ($user->subscription('default')->cancelled()) {
+    // Subscription has been cancelled
+}
+```
+
+```php onGracePeriod()
+// Check if on grace period after cancellation
+if ($user->subscription('default')->onGracePeriod()) {
+    // Subscription is cancelled but still active until period ends
+}
+```
+
+```php onTrial()
+// Check if subscription is on trial
+if ($user->subscription('default')->onTrial()) {
+    // Subscription is within trial period
+}
+```
+
+```php recurring()
+// Check if subscription is recurring (not on trial, not cancelled)
+if ($user->subscription('default')->recurring()) {
+    // Actively recurring subscription
+}
+```
+
+```php ended()
+// Check if subscription has completely ended
+if ($user->subscription('default')->ended()) {
+    // Subscription ended and grace period expired
+}
+```
+</CodeGroup>
+
+### Check Specific Plan
+
+Determine if a user is subscribed to a specific plan:
+
+```php
+if ($user->subscribedToPlan('PLN_gx2wn530m0i3w3m', 'default')) {
+    // User is subscribed to this specific plan
+}
+
+// Check multiple plans
+if ($user->subscribedToPlan(['PLN_plan1', 'PLN_plan2'], 'default')) {
+    // User is subscribed to one of these plans
+}
+```
+
+## Subscription Trials
+
+### With Payment Information
+
+Offer trial periods while collecting payment information upfront:
+
+```php
+$user->newSubscription('default', 'PLN_gx2wn530m0i3w3m')
+    ->trialDays(10)
+    ->create($authToken);
+```
+
+This sets the trial period ending date and instructs Paystack not to bill until after the trial expires.
+
+### Checking Trial Status
+
+```php
+// Check at user level
+if ($user->onTrial('default')) {
+    // User is on trial
+}
+
+// Check at subscription level
+if ($user->subscription('default')->onTrial()) {
+    // Subscription is on trial
+}
+
+// Get trial end date
+$trialEndsAt = $user->trialEndsAt('default');
+```
+
+### Without Payment Information
+
+Offer trials without collecting payment details by setting `trial_ends_at` on the Customer model:
+
+```php
+use veekthoven\Cashier\Customer;
+
+$customer = Customer::create([
+    'billable_id' => $user->getKey(),
+    'billable_type' => $user->getMorphClass(),
+    'trial_ends_at' => now()->addDays(10),
+]);
+```
+
+Check generic trial status:
+
+```php
+if ($user->onGenericTrial()) {
+    // User is on a generic trial
+}
+```
+
+## Cancelling Subscriptions
+
+### Cancel at Period End
+
+Cancel a subscription but allow it to remain active until the end of the billing period:
+
+```php
+$user->subscription('default')->cancel();
+```
+
+The subscription remains active during the grace period. Check grace period status:
+
+```php
+if ($user->subscription('default')->onGracePeriod()) {
+    // Subscription is cancelled but still active
+}
+```
+
+### Cancel Immediately
+
+Cancel a subscription immediately:
+
+```php
+$user->subscription('default')->cancelNow();
+```
+
+## Resuming Subscriptions
+
+<Warning>
+For Paystack, subscriptions can only be resumed if they have reached the end of their lifecycle. This uses the enable subscription API.
+</Warning>
+
+Resume a completed subscription:
+
+```php
+$user->subscription('default')->resume();
+```
+
+This removes the `ends_at` timestamp, making the subscription active again.
+
+## Swapping Plans
+
+Swap a subscription to a different plan:
+
+```php
+$user->subscription('default')->swap('PLN_new_plan_code');
+```
+
+With additional attributes:
+
+```php
+$user->subscription('default')->swap('PLN_new_plan_code', [
+    'start_date' => now()->addDays(7)->format('Y-m-d'),
+]);
+```
+
+<Note>
+Swapping plans will cancel the current subscription and create a new one starting at the specified date.
+</Note>
+
+## Subscription Scopes
+
+The `Subscription` model includes query scopes for filtering:
+
+```php
+use veekthoven\Cashier\Subscription;
+
+// Get all active subscriptions
+$active = Subscription::active()->get();
+
+// Get all cancelled subscriptions
+$cancelled = Subscription::cancelled()->get();
+
+// Get subscriptions on trial
+$onTrial = Subscription::onTrial()->get();
+
+// Get recurring subscriptions (not on trial, not cancelled)
+$recurring = Subscription::recurring()->get();
+
+// Get ended subscriptions
+$ended = Subscription::ended()->get();
+```
+
+## Multiple Subscriptions
+
+Users can have multiple subscriptions with different types:
+
+```php
+// Create multiple subscriptions
+$user->newSubscription('default', 'PLN_basic')->create($token);
+$user->newSubscription('premium', 'PLN_premium')->create($token);
+
+// Access specific subscriptions
+$defaultSubscription = $user->subscription('default');
+$premiumSubscription = $user->subscription('premium');
+
+// Check specific subscription
+if ($user->subscribed('premium')) {
+    // Has active premium subscription
+}
+```
+
+## Subscription Model
+
+The `Subscription` model is located at `veekthoven\Cashier\Subscription`:
+
+### Database Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Subscription name (default, premium, etc.) |
+| `paystack_plan` | string | Paystack plan ID |
+| `paystack_code` | string | Paystack subscription code |
+| `trial_ends_at` | datetime | Trial period end date |
+| `ends_at` | datetime | Subscription end date (for cancellations) |
+| `billable_id` | integer | ID of the billable model |
+| `billable_type` | string | Class name of the billable model |
+
+### Relationships
+
+```php
+// Get the billable model
+$user = $subscription->billable();
+
+// Access subscriptions from user
+$subscriptions = $user->subscriptions;
+```
+
+## Subscription Portal
+
+Generate a customer portal URL for subscription management:
+
+```php
+// Get the portal URL
+$portalUrl = $user->subscriptionPortalUrl();
+
+// Redirect to portal
+return $user->redirectToSubscriptionPortal();
+```
+
+## Middleware Protection
+
+Protect routes based on subscription status:
+
+```php app/Http/Middleware/EnsureUserIsSubscribed.php
+use Closure;
+
+public function handle($request, Closure $next)
+{
+    if ($request->user() && !$request->user()->subscribed('default')) {
+        // User is not a paying customer
+        return redirect('billing');
+    }
+
+    return $next($request);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payments" icon="credit-card" href="/core-concepts/payments">
+    Process one-time charges and refunds
+  </Card>
+  <Card title="Invoices" icon="file-invoice" href="/core-concepts/invoices">
+    Generate and manage invoices
+  </Card>
+</CardGroup>

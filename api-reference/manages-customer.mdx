@@ -1,0 +1,369 @@
+---
+title: 'ManagesCustomer'
+description: 'Methods for creating and managing Paystack customers'
+---
+
+## Overview
+
+The `ManagesCustomer` trait provides methods for creating and managing the relationship between your billable model and Paystack customers. This trait is included in the `Billable` trait.
+
+## Methods
+
+### createAsCustomer()
+
+Create a Paystack customer for the given model.
+
+```php
+public function createAsCustomer(array $options = []): array
+```
+
+<ParamField path="options" type="array" default="[]">
+  Additional options for customer creation
+</ParamField>
+
+**Options:**
+
+<ParamField path="options.email" type="string">
+  Customer email (defaults to `paystackEmail()` method result)
+</ParamField>
+
+<ParamField path="options.first_name" type="string">
+  Customer's first name
+</ParamField>
+
+<ParamField path="options.last_name" type="string">
+  Customer's last name
+</ParamField>
+
+<ParamField path="options.phone" type="string">
+  Customer's phone number
+</ParamField>
+
+<ParamField path="options.metadata" type="array">
+  Additional metadata to store with the customer
+</ParamField>
+
+**Returns:** `array`
+
+Returns the Paystack customer data array containing:
+- `id` - Paystack customer ID
+- `customer_code` - Paystack customer code
+- `email` - Customer email
+- Other customer details from Paystack
+
+**Throws:** `Exception` if unable to create the Paystack customer
+
+**Behavior:**
+
+This method:
+1. Creates a customer in Paystack using the provided options
+2. Stores the customer relationship in your local database with `paystack_id` and `paystack_code`
+3. Returns the customer data from Paystack
+
+**Example:**
+
+```php
+// Create with default email from model
+$customer = $user->createAsCustomer();
+
+// Create with custom options
+$customer = $user->createAsCustomer([
+    'email' => 'custom@example.com',
+    'first_name' => 'John',
+    'last_name' => 'Doe',
+    'phone' => '+2348012345678',
+    'metadata' => [
+        'custom_field' => 'value'
+    ]
+]);
+```
+
+---
+
+### paystackEmail()
+
+Get the billable's email address to associate with Paystack.
+
+```php
+public function paystackEmail(): ?string
+```
+
+**Returns:** `string|null`
+
+Returns the email address from the model's `email` attribute, or `null` if not set.
+
+**Example:**
+
+```php
+$email = $user->paystackEmail();
+```
+
+**Note:** You can override this method in your billable model to customize the email source:
+
+```php
+class User extends Authenticatable
+{
+    use Billable;
+    
+    public function paystackEmail(): ?string
+    {
+        return $this->billing_email ?? $this->email;
+    }
+}
+```
+
+---
+
+### asPaystackCustomer()
+
+Get the Paystack customer for the model.
+
+```php
+public function asPaystackCustomer(): array
+```
+
+**Returns:** `array`
+
+Returns the complete customer data from Paystack including:
+- `id` - Paystack customer ID
+- `customer_code` - Customer code
+- `email` - Customer email
+- `first_name` - First name
+- `last_name` - Last name
+- `phone` - Phone number
+- `metadata` - Customer metadata
+- `authorizations` - Array of saved payment methods
+- `subscriptions` - Array of subscriptions
+- Other customer details
+
+**Example:**
+
+```php
+$customer = $user->asPaystackCustomer();
+
+echo $customer['email'];
+echo $customer['customer_code'];
+
+// Access saved cards
+$cards = $customer['authorizations'];
+```
+
+---
+
+### customer()
+
+Get the customer relationship to the billable model.
+
+```php
+public function customer(): MorphOne
+```
+
+**Returns:** `Illuminate\Database\Eloquent\Relations\MorphOne`
+
+Returns the polymorphic relationship to the `Customer` model.
+
+**Example:**
+
+```php
+// Access customer relationship
+$customer = $user->customer;
+
+if ($customer) {
+    echo $customer->paystack_id;
+    echo $customer->paystack_code;
+    echo $customer->trial_ends_at;
+}
+
+// Check if customer exists
+if ($user->customer()->exists()) {
+    // Customer has been created
+}
+```
+
+---
+
+### assertCustomerExists()
+
+Determine if the billable is already a Paystack customer and throw an exception if not.
+
+```php
+protected function assertCustomerExists(): void
+```
+
+**Returns:** `void`
+
+**Throws:** `veekthoven\Cashier\Exceptions\InvalidCustomer` if the customer doesn't exist
+
+**Note:** This is a protected method used internally by other Cashier methods to ensure the customer has been created before performing operations.
+
+## Usage Examples
+
+### Creating a Customer on Registration
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+
+class RegisterController extends Controller
+{
+    public function register(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|min:8',
+            'phone' => 'required|string'
+        ]);
+        
+        // Create user
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password'])
+        ]);
+        
+        // Create as Paystack customer
+        try {
+            $user->createAsCustomer([
+                'phone' => $validated['phone'],
+                'metadata' => [
+                    'registered_at' => now()->toDateTimeString()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            // Handle error
+            Log::error('Failed to create Paystack customer: ' . $e->getMessage());
+        }
+        
+        return redirect()->route('dashboard');
+    }
+}
+```
+
+### Checking Customer Status
+
+```php
+$user = auth()->user();
+
+if (!$user->customer) {
+    // Create customer first
+    $user->createAsCustomer();
+}
+
+// Now proceed with billing operations
+$user->newSubscription('default', 'PLN_xxxxx')->create();
+```
+
+### Retrieving Customer Information
+
+```php
+$user = auth()->user();
+
+if ($user->customer) {
+    // Get local customer record
+    $localCustomer = $user->customer;
+    echo "Customer Code: " . $localCustomer->paystack_code;
+    
+    // Get full data from Paystack
+    $paystackCustomer = $user->asPaystackCustomer();
+    echo "Total Subscriptions: " . count($paystackCustomer['subscriptions']);
+    echo "Saved Cards: " . count($paystackCustomer['authorizations']);
+}
+```
+
+### Updating Customer Metadata
+
+```php
+class CustomerController extends Controller
+{
+    public function updateProfile(Request $request)
+    {
+        $user = auth()->user();
+        
+        if (!$user->customer) {
+            return back()->with('error', 'No customer record found.');
+        }
+        
+        // Fetch current customer data
+        $customer = $user->asPaystackCustomer();
+        
+        // Update metadata (you would use Paystack API directly)
+        $updatedMetadata = array_merge(
+            $customer['metadata'] ?? [],
+            ['last_profile_update' => now()->toDateTimeString()]
+        );
+        
+        // Update via Paystack API
+        Paystack::updateCustomer($user->customer->paystack_code, [
+            'metadata' => $updatedMetadata
+        ]);
+        
+        return back()->with('success', 'Profile updated!');
+    }
+}
+```
+
+### Custom Email Source
+
+```php
+class Team extends Model
+{
+    use Billable;
+    
+    /**
+     * Override to use owner's email
+     */
+    public function paystackEmail(): ?string
+    {
+        return $this->owner->email;
+    }
+    
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+}
+
+// Usage
+$team = Team::find(1);
+$team->createAsCustomer(); // Uses owner's email
+```
+
+### Middleware to Ensure Customer Exists
+
+```php
+class EnsureCustomerExists
+{
+    public function handle($request, Closure $next)
+    {
+        $user = $request->user();
+        
+        if (!$user->customer) {
+            try {
+                $user->createAsCustomer();
+            } catch (\Exception $e) {
+                return redirect()->route('billing.setup')
+                    ->with('error', 'Please complete billing setup.');
+            }
+        }
+        
+        return $next($request);
+    }
+}
+```
+
+## Important Notes
+
+1. **One-Time Creation**: You should only call `createAsCustomer()` once per billable model. Subsequent calls will create duplicate customers in Paystack.
+
+2. **Email Requirement**: A valid email is required to create a Paystack customer. Ensure the model has an email before calling `createAsCustomer()`.
+
+3. **Relationship Storage**: Customer data (`paystack_id` and `paystack_code`) is stored in a separate `customers` table via a polymorphic relationship.
+
+4. **Automatic Creation**: Some operations (like creating subscriptions) may require the customer to exist first. Always check or create the customer before billing operations.
+
+5. **Data Sync**: The local customer record only stores IDs. Use `asPaystackCustomer()` to fetch the latest data from Paystack.
+
+## Source Location
+
+`src/Concerns/ManagesCustomer.php:1-81`

@@ -1,0 +1,454 @@
+---
+title: Invoices
+description: Generate, manage, and download invoices for your customers
+---
+
+## Introduction
+
+Cashier provides tools for creating and managing invoices through Paystack. You can generate invoices for one-time charges, download PDFs, and manage invoice lifecycle.
+
+## Creating Invoices
+
+### Invoice with Charge
+
+Create an invoice that charges the customer immediately:
+
+```php
+$user->invoiceFor('One Time Fee', 200000, [
+    'due_date' => now()->addDays(7),
+]);
+```
+
+<Note>
+Amounts are in kobo for Naira (100 kobo = ₦1). The `due_date` parameter is required.
+</Note>
+
+### Invoice with Line Items
+
+Create detailed invoices with multiple line items:
+
+```php
+$user->invoiceFor('Monthly Services', 50000, [
+    'due_date' => now()->addDays(7),
+    'line_items' => [
+        [
+            'name' => 'Consulting Services',
+            'amount' => 30000,
+        ],
+        [
+            'name' => 'Support Services',
+            'amount' => 20000,
+        ],
+    ],
+]);
+```
+
+### Invoice with Taxes
+
+Add tax information to invoices:
+
+```php
+$user->invoiceFor('Product Purchase', 50000, [
+    'due_date' => now()->addDays(7),
+    'tax' => [
+        ['name' => 'VAT', 'amount' => 2000],
+        ['name' => 'Service Tax', 'amount' => 1000],
+    ],
+]);
+```
+
+### Tab Method
+
+The `tab` method creates an invoice without immediate charge:
+
+```php
+$user->tab('Pending Payment', 100000, [
+    'due_date' => now()->addDays(14),
+    'description' => 'Payment for services rendered',
+]);
+```
+
+## Retrieving Invoices
+
+### All Invoices
+
+Retrieve all invoices for a customer:
+
+```php
+$invoices = $user->invoices();
+
+foreach ($invoices as $invoice) {
+    echo $invoice['amount'];
+    echo $invoice['status'];
+    echo $invoice['due_date'];
+}
+```
+
+### Pending Invoices
+
+Get only pending invoices:
+
+```php
+$pending = $user->invoicesOnlyPending();
+```
+
+### Paid Invoices
+
+Get only paid invoices:
+
+```php
+$paid = $user->invoicesOnlyPaid();
+```
+
+### With Additional Parameters
+
+Pass additional filtering parameters:
+
+```php
+$invoices = $user->invoices([
+    'from' => now()->subMonths(3),
+    'to' => now(),
+]);
+```
+
+## Finding Specific Invoices
+
+### Find Invoice
+
+Find a specific invoice by ID:
+
+```php
+$invoice = $user->findInvoice($invoiceId);
+
+if ($invoice) {
+    echo $invoice->total();
+    echo $invoice->date()->toFormattedDateString();
+}
+```
+
+### Find or Fail
+
+Find an invoice or throw a 404 error:
+
+```php
+$invoice = $user->findInvoiceOrFail($invoiceId);
+```
+
+## Invoice Information
+
+The `Invoice` class provides methods to access invoice data:
+
+### Date Information
+
+```php
+// Get invoice date as Carbon instance
+$date = $invoice->date();
+
+// With timezone
+$date = $invoice->date('America/New_York');
+
+// Format the date
+echo $invoice->date()->toFormattedDateString();
+```
+
+### Amount Information
+
+```php
+// Formatted total amount
+echo $invoice->total(); // "₦2,000.00"
+
+// Raw total amount (in kobo)
+$rawTotal = $invoice->rawTotal(); // 200000
+
+// Subtotal (before discounts)
+echo $invoice->subtotal();
+```
+
+### Discounts
+
+```php
+// Check if invoice has discount
+if ($invoice->hasDiscount()) {
+    // Get discount amount
+    echo $invoice->discount();
+    
+    // Check if percentage discount
+    if ($invoice->discountIsPercentage()) {
+        echo $invoice->percentOff() . '%';
+    } else {
+        echo $invoice->amountOff();
+    }
+}
+```
+
+### Line Items
+
+```php
+$items = $invoice->invoiceItems();
+
+foreach ($items as $item) {
+    echo $item['name'];
+    echo $item['amount'];
+}
+```
+
+### Starting Balance
+
+```php
+if ($invoice->hasStartingBalance()) {
+    echo $invoice->startingBalance();
+    $rawBalance = $invoice->rawStartingBalance();
+}
+```
+
+## Invoice Management
+
+### Check Status
+
+```php
+$status = $invoice->status();
+
+if ($status === 'paid') {
+    // Invoice is paid
+} elseif ($status === 'pending') {
+    // Invoice is pending
+} elseif ($status === 'draft') {
+    // Invoice is draft
+}
+```
+
+### Update Invoice
+
+Update invoice details:
+
+```php
+$invoice->update([
+    'due_date' => now()->addDays(14),
+    'description' => 'Updated description',
+]);
+```
+
+### Finalize Invoice
+
+Finalize a draft invoice:
+
+```php
+$invoice->finalize();
+```
+
+If the invoice is already finalized, this will send a notification instead.
+
+### Notify Customer
+
+Send invoice notification to customer:
+
+```php
+$invoice->notify();
+```
+
+### Verify Invoice
+
+Verify invoice payment:
+
+```php
+$response = $invoice->verify();
+```
+
+### Archive Invoice
+
+Archive an invoice:
+
+```php
+$invoice->archive();
+```
+
+## PDF Generation
+
+### Download Invoice PDF
+
+Generate and download an invoice as PDF:
+
+```php
+use Illuminate\Http\Request;
+
+Route::get('/user/invoice/{invoice}', function (Request $request, $invoiceId) {
+    return $request->user()->downloadInvoice($invoiceId, [
+        'vendor' => 'Your Company',
+        'product' => 'Your Product',
+    ]);
+});
+```
+
+### Custom PDF Data
+
+Pass additional data to the PDF:
+
+```php
+return $user->downloadInvoice($invoiceId, [
+    'vendor' => 'Acme Corporation',
+    'product' => 'Premium Subscription',
+    'street' => '123 Main Street',
+    'location' => 'Lagos, Nigeria',
+    'phone' => '+234 800 123 4567',
+]);
+```
+
+### Generate PDF Bytes
+
+Get the raw PDF bytes instead of downloading:
+
+```php
+$pdfBytes = $invoice->pdf([
+    'vendor' => 'Your Company',
+    'product' => 'Your Product',
+]);
+
+// Store or email the PDF
+Storage::put('invoices/' . $invoice->id . '.pdf', $pdfBytes);
+```
+
+### Custom Invoice View
+
+Get the invoice view for customization:
+
+```php
+$view = $invoice->view([
+    'vendor' => 'Your Company',
+    'product' => 'Your Product',
+]);
+
+return $view; // Returns rendered HTML
+```
+
+## Displaying Invoices
+
+Display invoices in a table:
+
+```blade
+<table>
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach ($invoices as $invoice)
+            <tr>
+                <td>{{ $invoice->date()->toFormattedDateString() }}</td>
+                <td>{{ $invoice->total() }}</td>
+                <td>{{ $invoice->status() }}</td>
+                <td>
+                    <a href="/user/invoice/{{ $invoice->id }}">
+                        Download
+                    </a>
+                </td>
+            </tr>
+        @endforeach
+    </tbody>
+</table>
+```
+
+## Invoice Model
+
+The `Invoice` class wraps Paystack invoice data:
+
+### Accessing Raw Data
+
+Access the underlying Paystack invoice:
+
+```php
+$paystackInvoice = $invoice->asPaystackInvoice();
+
+// Access any Paystack property
+echo $paystackInvoice['customer']['email'];
+echo $paystackInvoice['request_code'];
+```
+
+### Dynamic Properties
+
+Access invoice properties directly:
+
+```php
+echo $invoice->id;
+echo $invoice->amount;
+echo $invoice->status;
+echo $invoice->created_at;
+```
+
+## Requirements
+
+PDF generation requires the `dompdf` package:
+
+```bash
+composer require dompdf/dompdf
+```
+
+## Customizing Invoice View
+
+Publish and customize the invoice view:
+
+```bash
+php artisan vendor:publish --tag=cashier-views
+```
+
+The view will be published to `resources/views/vendor/cashier/receipt.blade.php`.
+
+## Complete Example
+
+Complete invoice workflow:
+
+```php
+// Create invoice
+$response = $user->invoiceFor('Consulting Services', 500000, [
+    'due_date' => now()->addDays(30),
+    'line_items' => [
+        ['name' => 'Strategy Consultation', 'amount' => 300000],
+        ['name' => 'Implementation Support', 'amount' => 200000],
+    ],
+    'tax' => [
+        ['name' => 'VAT (7.5%)', 'amount' => 37500],
+    ],
+]);
+
+// Find the invoice
+$invoice = $user->findInvoice($response['data']['id']);
+
+// Send notification
+$invoice->notify();
+
+// Generate PDF
+return $invoice->download([
+    'vendor' => 'Acme Corp',
+    'product' => 'Professional Services',
+]);
+```
+
+## Error Handling
+
+```php
+try {
+    $invoice = $user->findInvoiceOrFail($invoiceId);
+    return $invoice->download($data);
+    
+} catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e) {
+    return redirect('/invoices')->with('error', 'Invoice not found');
+    
+} catch (\Exception $e) {
+    logger()->error('Invoice error: ' . $e->getMessage());
+    return back()->with('error', 'Failed to generate invoice');
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Webhooks" icon="webhook" href="/advanced/webhooks">
+    Handle invoice webhook events
+  </Card>
+  <Card title="Subscriptions" icon="repeat" href="/core-concepts/subscriptions">
+    Learn about recurring subscriptions
+  </Card>
+</CardGroup>

@@ -1,0 +1,367 @@
+---
+title: 'Events'
+description: 'API reference for all Laravel Cashier Paystack events'
+---
+
+Laravel Cashier Paystack dispatches several events during the subscription lifecycle. You can listen to these events to perform additional actions.
+
+## Subscription Events
+
+### `SubscriptionCreated`
+
+Dispatched when a new subscription is created.
+
+**Namespace:** `veekthoven\Cashier\Events\SubscriptionCreated`
+
+**Properties:**
+
+- `$billable` (Model): The billable entity (e.g., User)
+- `$subscription` (Subscription): The subscription instance
+- `$payload` (array): The webhook payload data
+
+**Example:**
+
+```php
+use veekthoven\Cashier\Events\SubscriptionCreated;
+
+class SendSubscriptionWelcomeEmail
+{
+    public function handle(SubscriptionCreated $event)
+    {
+        $user = $event->billable;
+        $subscription = $event->subscription;
+        
+        // Send welcome email
+        Mail::to($user->email)->send(
+            new SubscriptionWelcome($user, $subscription)
+        );
+        
+        // Log subscription creation
+        Log::info('Subscription created', [
+            'user_id' => $user->id,
+            'subscription_id' => $subscription->id,
+            'plan' => $subscription->paystack_plan,
+        ]);
+    }
+}
+```
+
+### `SubscriptionCancelled`
+
+Dispatched when a subscription is cancelled.
+
+**Namespace:** `veekthoven\Cashier\Events\SubscriptionCancelled`
+
+**Properties:**
+
+- `$billable` (Model): The billable entity (e.g., User)
+- `$subscription` (Subscription): The subscription instance
+- `$payload` (array): The webhook payload data
+
+**Example:**
+
+```php
+use veekthoven\Cashier\Events\SubscriptionCancelled;
+
+class HandleSubscriptionCancellation
+{
+    public function handle(SubscriptionCancelled $event)
+    {
+        $user = $event->billable;
+        $subscription = $event->subscription;
+        
+        // Send cancellation confirmation
+        Mail::to($user->email)->send(
+            new SubscriptionCancelled($user, $subscription)
+        );
+        
+        // Revoke access to premium features
+        $user->update(['has_premium_access' => false]);
+        
+        // Log cancellation
+        Log::info('Subscription cancelled', [
+            'user_id' => $user->id,
+            'subscription_id' => $subscription->id,
+            'ends_at' => $subscription->ends_at,
+        ]);
+    }
+}
+```
+
+### `PaymentFailed`
+
+Dispatched when a payment fails.
+
+**Namespace:** `App\Events\PaymentFailed`
+
+**Properties:**
+
+- `$billable` (mixed): The billable entity
+- `$subscription` (mixed): The subscription instance
+- `$payload` (mixed): The webhook payload data
+
+**Example:**
+
+```php
+use App\Events\PaymentFailed;
+
+class HandleFailedPayment
+{
+    public function handle(PaymentFailed $event)
+    {
+        $user = $event->billable;
+        $subscription = $event->subscription;
+        $payload = $event->payload;
+        
+        // Notify user of failed payment
+        Mail::to($user->email)->send(
+            new PaymentFailedNotification($user, $subscription)
+        );
+        
+        // Log the failure
+        Log::warning('Payment failed', [
+            'user_id' => $user->id,
+            'subscription_id' => $subscription->id,
+            'reason' => $payload['reason'] ?? 'Unknown',
+        ]);
+        
+        // Update user status
+        $user->payment_failed_count++;
+        $user->save();
+    }
+}
+```
+
+### `InvoiceCreated`
+
+Dispatched when an invoice is created.
+
+**Namespace:** `App\Events\InvoiceCreated`
+
+**Properties:**
+
+- `$billable` (mixed): The billable entity
+- `$subscription` (mixed): The subscription instance
+- `$payload` (mixed): The webhook payload data
+
+**Example:**
+
+```php
+use App\Events\InvoiceCreated;
+
+class ProcessNewInvoice
+{
+    public function handle(InvoiceCreated $event)
+    {
+        $user = $event->billable;
+        $invoice = $event->payload;
+        
+        // Send invoice notification
+        Mail::to($user->email)->send(
+            new InvoiceCreatedNotification($user, $invoice)
+        );
+        
+        // Store invoice reference
+        $user->invoices()->create([
+            'paystack_invoice_id' => $invoice['id'],
+            'amount' => $invoice['amount'],
+            'status' => $invoice['status'],
+        ]);
+    }
+}
+```
+
+## Webhook Events
+
+### `WebhookReceived`
+
+Dispatched when any webhook is received from Paystack.
+
+**Namespace:** `veekthoven\Cashier\Events\WebhookReceived`
+
+**Properties:**
+
+- `$payload` (array): The complete webhook payload
+
+**Example:**
+
+```php
+use veekthoven\Cashier\Events\WebhookReceived;
+
+class LogWebhookReceived
+{
+    public function handle(WebhookReceived $event)
+    {
+        $payload = $event->payload;
+        
+        // Log all webhooks for debugging
+        Log::debug('Webhook received', [
+            'event' => $payload['event'] ?? 'unknown',
+            'data' => $payload['data'] ?? [],
+        ]);
+        
+        // Store webhook for audit trail
+        WebhookLog::create([
+            'event_type' => $payload['event'] ?? 'unknown',
+            'payload' => $payload,
+            'received_at' => now(),
+        ]);
+    }
+}
+```
+
+### `WebhookHandled`
+
+Dispatched after a webhook has been successfully handled.
+
+**Namespace:** `veekthoven\Cashier\Events\WebhookHandled`
+
+**Properties:**
+
+- `$payload` (array): The complete webhook payload
+
+**Example:**
+
+```php
+use veekthoven\Cashier\Events\WebhookHandled;
+
+class UpdateWebhookStatus
+{
+    public function handle(WebhookHandled $event)
+    {
+        $payload = $event->payload;
+        
+        // Update webhook processing status
+        WebhookLog::where('event_type', $payload['event'])
+            ->latest()
+            ->first()
+            ->update(['processed' => true]);
+        
+        Log::info('Webhook handled successfully', [
+            'event' => $payload['event'] ?? 'unknown',
+        ]);
+    }
+}
+```
+
+## Registering Event Listeners
+
+### Using Event Service Provider
+
+```php
+use App\Listeners\HandleFailedPayment;
+use App\Listeners\HandleSubscriptionCancellation;
+use App\Listeners\LogWebhookReceived;
+use App\Listeners\ProcessNewInvoice;
+use App\Listeners\SendSubscriptionWelcomeEmail;
+use App\Events\InvoiceCreated;
+use App\Events\PaymentFailed;
+use veekthoven\Cashier\Events\SubscriptionCancelled;
+use veekthoven\Cashier\Events\SubscriptionCreated;
+use veekthoven\Cashier\Events\WebhookReceived;
+
+protected $listen = [
+    SubscriptionCreated::class => [
+        SendSubscriptionWelcomeEmail::class,
+    ],
+    SubscriptionCancelled::class => [
+        HandleSubscriptionCancellation::class,
+    ],
+    PaymentFailed::class => [
+        HandleFailedPayment::class,
+    ],
+    InvoiceCreated::class => [
+        ProcessNewInvoice::class,
+    ],
+    WebhookReceived::class => [
+        LogWebhookReceived::class,
+    ],
+];
+```
+
+### Using Closure Listeners
+
+```php
+use Illuminate\Support\Facades\Event;
+use veekthoven\Cashier\Events\SubscriptionCreated;
+
+Event::listen(function (SubscriptionCreated $event) {
+    // Handle the event
+    Log::info('New subscription: ' . $event->subscription->id);
+});
+```
+
+## Common Use Cases
+
+### Send Welcome Email on Subscription
+
+```php
+use veekthoven\Cashier\Events\SubscriptionCreated;
+
+Event::listen(SubscriptionCreated::class, function ($event) {
+    Mail::to($event->billable->email)->send(
+        new WelcomeEmail($event->billable, $event->subscription)
+    );
+});
+```
+
+### Update User Role on Subscription
+
+```php
+use veekthoven\Cashier\Events\SubscriptionCreated;
+
+Event::listen(SubscriptionCreated::class, function ($event) {
+    $user = $event->billable;
+    $user->assignRole('premium');
+    
+    // Grant premium features
+    $user->update([
+        'max_projects' => 100,
+        'storage_limit' => 10000,
+    ]);
+});
+```
+
+### Handle Failed Payments
+
+```php
+use App\Events\PaymentFailed;
+
+Event::listen(PaymentFailed::class, function ($event) {
+    $user = $event->billable;
+    
+    // Notify user
+    Mail::to($user->email)->send(new PaymentFailedEmail($user));
+    
+    // Update payment method reminder
+    $user->update(['payment_method_needs_update' => true]);
+    
+    // Suspend account after 3 failures
+    if ($user->payment_failed_count >= 3) {
+        $user->update(['account_suspended' => true]);
+    }
+});
+```
+
+### Analytics Tracking
+
+```php
+use veekthoven\Cashier\Events\SubscriptionCreated;
+use veekthoven\Cashier\Events\SubscriptionCancelled;
+
+Event::listen(SubscriptionCreated::class, function ($event) {
+    Analytics::track('Subscription Created', [
+        'user_id' => $event->billable->id,
+        'plan' => $event->subscription->paystack_plan,
+        'value' => $event->subscription->amount,
+    ]);
+});
+
+Event::listen(SubscriptionCancelled::class, function ($event) {
+    Analytics::track('Subscription Cancelled', [
+        'user_id' => $event->billable->id,
+        'plan' => $event->subscription->paystack_plan,
+        'reason' => $event->payload['reason'] ?? 'Unknown',
+    ]);
+});
+```

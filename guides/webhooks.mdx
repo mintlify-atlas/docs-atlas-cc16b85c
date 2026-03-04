@@ -1,0 +1,391 @@
+---
+title: Webhooks
+description: Set up and handle Paystack webhooks to receive real-time notifications about subscription events, payments, and more
+---
+
+Paystack uses webhooks to notify your application about events such as successful payments, failed charges, subscription changes, and invoice updates. Laravel Cashier Paystack provides a webhook controller to handle these events automatically.
+
+## Setting Up Webhooks
+
+<Steps>
+  <Step title="Register the webhook route">
+    The webhook route is automatically registered if routes are enabled. By default, it's available at `/paystack/webhook`.
+
+    You can customize the path by setting the `PAYSTACK_PATH` environment variable:
+
+    ```env
+    PAYSTACK_PATH=/custom-webhook-path
+    ```
+
+    Or manually define your own route:
+
+    ```php
+    Route::post(
+        'paystack/webhook',
+        '\veekthoven\Cashier\Http\Controllers\WebhookController'
+    );
+    ```
+  </Step>
+
+  <Step title="Configure CSRF protection">
+    Since Paystack webhooks need to bypass Laravel's CSRF protection, add the webhook URI as an exception.
+
+    **Laravel 10 and earlier** - In `app/Http/Middleware/VerifyCsrfToken.php`:
+
+    ```php
+    protected $except = [
+        'paystack/*',
+    ];
+    ```
+
+    **Laravel 11+** - In `bootstrap/app.php`:
+
+    ```php
+    return Application::configure(basePath: dirname(__DIR__))
+        ->withRouting(
+            // ...
+        )
+        ->withMiddleware(function (Middleware $middleware) {
+            $middleware->validateCsrfTokens(
+                except: ['paystack/*']
+            );
+        })
+        ->withExceptions(function (Exceptions $exceptions) {
+            // ...
+        })->create();
+    ```
+  </Step>
+
+  <Step title="Configure webhook URL in Paystack">
+    Log in to your Paystack dashboard, navigate to **Settings > Webhooks**, and add your webhook URL:
+
+    ```
+    https://yourdomain.com/paystack/webhook
+    ```
+
+    <Note>
+      For local development, you can use tools like [Ngrok](https://ngrok.com/) or [Laravel Valet share](https://laravel.com/docs/valet#sharing-sites) to expose your local server.
+    </Note>
+  </Step>
+</Steps>
+
+## Webhook Signature Verification
+
+Cashier automatically verifies webhook signatures to ensure requests are genuinely from Paystack. The `VerifyWebhookSignature` middleware is applied automatically when your `PAYSTACK_SECRET_KEY` is configured.
+
+<Accordion title="View signature verification implementation">
+  ```php
+  // From src/Http/Middleware/VerifyWebhookSignature.php
+  final class VerifyWebhookSignature
+  {
+      public function handle(Request $request, Closure $next)
+      {
+          if ($this->isInvalidSignature(
+              $request->getContent(), 
+              $request->header('x-paystack-signature')
+          )) {
+              throw new AccessDeniedHttpException('Invalid webhook signature.');
+          }
+
+          return $next($request);
+      }
+
+      protected function isInvalidSignature(string $payload, string $signature): bool
+      {
+          $hash = hash_hmac('sha512', $payload, Config::get('cashier-paystack.secret_key'));
+          return hash_equals($hash, $signature) === false;
+      }
+  }
+  ```
+</Accordion>
+
+<Warning>
+  Always ensure your `PAYSTACK_SECRET_KEY` is set in your `.env` file to enable signature verification.
+</Warning>
+
+## Default Webhook Handlers
+
+Cashier automatically handles several common webhook events:
+
+### Subscription Created
+
+When a new subscription is created (`subscription.create` event):
+
+```php
+// Automatically handled by Cashier
+protected function handleSubscriptionCreate(array $payload)
+{
+    $data = $payload['data'];
+    $billable = $this->resolveBillable($payload);
+    $subscription = $this->findSubscription($data['subscription_code']);
+
+    if ($billable && ! isset($subscription)) {
+        $plan = $data['plan'];
+        $builder = $billable->newSubscription($plan['name'], $plan['plan_code']);
+        $subscription = $builder->save($data);
+        
+        SubscriptionCreated::dispatch($billable, $subscription, $payload);
+    }
+}
+```
+
+### Subscription Disabled
+
+When a subscription is disabled (`subscription.disable` event):
+
+```php
+protected function handleSubscriptionDisable($payload)
+{
+    $subscriptionCode = $payload['data']['subscription_code'];
+    $subscription = $this->findSubscription($subscriptionCode);
+
+    if ($subscription && (! $subscription->cancelled() || $subscription->onGracePeriod())) {
+        $subscription->markAsCancelled();
+        SubscriptionCancelled::dispatch($subscription->billable, $subscription, $payload);
+    }
+}
+```
+
+### Subscription Not Renewing
+
+When a subscription will not renew (`subscription.not_renew` event):
+
+```php
+protected function handleSubscriptionNotRenew(array $payload)
+{
+    $billable = $this->resolveBillable($payload);
+    $subscription = $this->findSubscription($data['subscription_code']);
+    
+    SubscriptionCancelled::dispatch($billable, $subscription, $payload);
+}
+```
+
+### Invoice Created
+
+When an invoice is created (`invoice.create` event):
+
+```php
+protected function handleInvoiceCreate(array $payload)
+{
+    $billable = $this->resolveBillable($payload);
+    $subscription = $this->findSubscription($data['subscription']['subscription_code']);
+    
+    InvoiceCreated::dispatch($billable, $subscription, $payload);
+}
+```
+
+### Invoice Payment Failed
+
+When an invoice payment fails (`invoice.payment_failed` event):
+
+```php
+protected function handleInvoicePaymentFailed(array $payload)
+{
+    $billable = $this->resolveBillable($payload);
+    $subscription = $this->findSubscription($data['subscription']['subscription_code']);
+    
+    PaymentFailed::dispatch($billable, $subscription, $payload);
+}
+```
+
+## Extending the Webhook Controller
+
+To handle additional webhook events, extend the webhook controller and define custom handler methods.
+
+<Steps>
+  <Step title="Create a custom webhook controller">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use veekthoven\Cashier\Http\Controllers\WebhookController as CashierController;
+
+    class WebhookController extends CashierController
+    {
+        /**
+         * Handle invoice update events.
+         *
+         * @param  array  $payload
+         * @return \Symfony\Component\HttpFoundation\Response
+         */
+        public function handleInvoiceUpdate($payload)
+        {
+            // Access the invoice data
+            $invoiceData = $payload['data'];
+            
+            // Your custom logic here
+            \Log::info('Invoice updated', $invoiceData);
+            
+            // Optionally return a response
+            return response('Webhook handled', 200);
+        }
+        
+        /**
+         * Handle charge success events.
+         */
+        public function handleChargeSuccess($payload)
+        {
+            $charge = $payload['data'];
+            
+            // Handle successful charge
+            // For example, fulfill an order, send a receipt, etc.
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Update your route">
+    Point the webhook route to your custom controller:
+
+    ```php
+    Route::post(
+        'paystack/webhook',
+        '\App\Http\Controllers\WebhookController'
+    );
+    ```
+  </Step>
+</Steps>
+
+### Handler Method Naming Convention
+
+Method names should be prefixed with `handle` and use the camelCase version of the Paystack event name:
+
+| Paystack Event | Handler Method |
+|---|---|
+| `subscription.create` | `handleSubscriptionCreate` |
+| `subscription.disable` | `handleSubscriptionDisable` |
+| `invoice.create` | `handleInvoiceCreate` |
+| `invoice.update` | `handleInvoiceUpdate` |
+| `invoice.payment_failed` | `handleInvoicePaymentFailed` |
+| `charge.success` | `handleChargeSuccess` |
+| `transfer.success` | `handleTransferSuccess` |
+| `transfer.failed` | `handleTransferFailed` |
+
+## Webhook Events
+
+Cashier dispatches Laravel events when webhooks are received:
+
+### WebhookReceived
+
+Dispatched immediately when any webhook is received:
+
+```php
+use veekthoven\Cashier\Events\WebhookReceived;
+
+class LogWebhooks
+{
+    public function handle(WebhookReceived $event)
+    {
+        $payload = $event->payload;
+        \Log::info('Webhook received: ' . $payload['event']);
+    }
+}
+```
+
+### WebhookHandled
+
+Dispatched after a webhook has been successfully processed:
+
+```php
+use veekthoven\Cashier\Events\WebhookHandled;
+
+class NotifyAdminOfWebhook
+{
+    public function handle(WebhookHandled $event)
+    {
+        $payload = $event->payload;
+        // Notify admin that webhook was handled
+    }
+}
+```
+
+### SubscriptionCreated
+
+```php
+use veekthoven\Cashier\Events\SubscriptionCreated;
+
+class SendWelcomeEmail
+{
+    public function handle(SubscriptionCreated $event)
+    {
+        $billable = $event->billable;
+        $subscription = $event->subscription;
+        
+        // Send welcome email to customer
+    }
+}
+```
+
+### SubscriptionCancelled
+
+```php
+use veekthoven\Cashier\Events\SubscriptionCancelled;
+
+class HandleCancellation
+{
+    public function handle(SubscriptionCancelled $event)
+    {
+        $billable = $event->billable;
+        $subscription = $event->subscription;
+        
+        // Handle subscription cancellation
+    }
+}
+```
+
+## Testing Webhooks
+
+For local development and testing:
+
+<Steps>
+  <Step title="Use Ngrok or Valet Share">
+    Expose your local server to the internet:
+
+    ```bash
+    # Using Ngrok
+    ngrok http 80
+
+    # Using Laravel Valet
+    valet share
+    ```
+  </Step>
+
+  <Step title="Add the public URL to Paystack">
+    Copy the public URL and add it to your Paystack webhook settings:
+
+    ```
+    https://abc123.ngrok.io/paystack/webhook
+    ```
+  </Step>
+
+  <Step title="Trigger test events">
+    Use the Paystack dashboard to send test webhook events to your local application.
+  </Step>
+</Steps>
+
+<Note>
+  Check your Laravel logs to verify that webhooks are being received and processed correctly.
+</Note>
+
+## Webhook Security Best Practices
+
+1. **Always verify signatures** - Never disable the `VerifyWebhookSignature` middleware in production
+2. **Use HTTPS** - Ensure your webhook endpoint uses HTTPS in production
+3. **Keep secrets secure** - Never commit your `PAYSTACK_SECRET_KEY` to version control
+4. **Validate payload data** - Always validate and sanitize webhook payload data before using it
+5. **Handle failures gracefully** - Use try-catch blocks to prevent webhook failures from breaking your application
+
+```php
+public function handleChargeSuccess($payload)
+{
+    try {
+        $charge = $payload['data'];
+        // Process charge...
+    } catch (\Exception $e) {
+        \Log::error('Webhook processing failed: ' . $e->getMessage());
+        // Don't throw - return 200 to prevent retries
+        return response('Error logged', 200);
+    }
+}
+```

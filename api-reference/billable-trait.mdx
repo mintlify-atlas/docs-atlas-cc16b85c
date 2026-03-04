@@ -1,0 +1,104 @@
+---
+title: 'Billable Trait'
+description: 'Main trait that provides billing functionality to your model'
+---
+
+## Overview
+
+The `Billable` trait is the main trait you add to your billable model (typically `User`) to enable Cashier Paystack functionality. It combines all payment-related features into a single trait.
+
+## Usage
+
+Add the trait to your billable model:
+
+```php
+use veekthoven\Cashier\Billable;
+
+class User extends Authenticatable
+{
+    use Billable;
+}
+```
+
+## Included Traits
+
+The `Billable` trait includes the following concerns:
+
+- **ManagesCards** - Methods for managing payment cards
+- **ManagesCustomer** - Methods for customer creation and management
+- **ManagesInvoices** - Methods for invoice handling
+- **ManagesPayments** - Methods for charges and refunds
+- **ManagesSubscriptions** - Methods for subscription management
+
+## Available Methods
+
+Once added to your model, the `Billable` trait provides access to all methods from the included traits:
+
+### Customer Management
+- `createAsCustomer()` - Create a Paystack customer
+- `asPaystackCustomer()` - Retrieve customer data from Paystack
+- `paystackEmail()` - Get the email for Paystack
+- `customer()` - Get the customer relationship
+
+### Subscription Management
+- `subscriptions()` - Get all subscriptions
+- `subscription()` - Get a specific subscription
+- `newSubscription()` - Create a new subscription
+- `subscribed()` - Check if subscribed
+- `subscribedToPlan()` - Check if subscribed to specific plan
+- `onTrial()` - Check if on trial
+- `hasExpiredTrial()` - Check if trial has expired
+- `subscriptionPortalUrl()` - Get customer portal URL
+- `redirectToSubscriptionPortal()` - Redirect to customer portal
+
+### Payment Methods
+- `charge()` - Make a one-off or recurring charge
+- `refund()` - Refund a transaction
+- `preferredCurrency()` - Get the preferred currency
+
+### Card Management
+- `cards()` - Get all payment cards
+- `deleteCards()` - Delete all payment cards
+
+### Invoice Management
+- `tab()` - Create an invoice
+- `invoiceFor()` - Invoice for a specific amount
+- `findInvoice()` - Find an invoice by ID
+- `findInvoiceOrFail()` - Find an invoice or throw 404
+- `downloadInvoice()` - Download an invoice
+- `invoices()` - Get all invoices
+- `invoicesOnlyPending()` - Get pending invoices
+- `invoicesOnlyPaid()` - Get paid invoices
+
+## Example
+
+```php
+use App\Models\User;
+
+// Get a user
+$user = User::find(1);
+
+// Create as Paystack customer
+$user->createAsCustomer();
+
+// Create a subscription
+$user->newSubscription('default', 'PLN_xxxxxxxxx')
+    ->create();
+
+// Check if subscribed
+if ($user->subscribed('default')) {
+    // User has an active subscription
+}
+
+// Make a one-off charge
+$user->charge(5000, [
+    'authorization_code' => 'AUTH_xxxxx'
+]);
+
+// Get all invoices
+$invoices = $user->invoices();
+```
+
+## Source Location
+
+`src/Billable.php`

@@ -1,0 +1,218 @@
+---
+title: Customers
+description: Create and manage Paystack customers for your billable models
+---
+
+## Introduction
+
+Before creating subscriptions or processing payments, you need to create a Paystack customer record. The customer record links your application's user to their Paystack account.
+
+## Creating Customers
+
+You can create a Paystack customer without beginning a subscription using the `createAsCustomer` method:
+
+```php
+$user->createAsCustomer();
+```
+
+This method will:
+1. Create a customer in Paystack
+2. Store the customer ID and code in your local database
+3. Return the Paystack customer data
+
+### With Additional Options
+
+You can pass additional customer details to Paystack:
+
+```php
+$user->createAsCustomer([
+    'first_name' => 'John',
+    'last_name' => 'Doe',
+    'phone' => '+2348012345678',
+]);
+```
+
+<Note>
+By default, the customer's email is taken from the `email` attribute on your billable model.
+</Note>
+
+## Automatic Customer Creation
+
+A common pattern is to automatically create customers when users register. You can listen for the `Registered` event:
+
+```php app/Listeners/CreatePaystackCustomer.php
+use Illuminate\Auth\Events\Registered;
+
+class CreatePaystackCustomer
+{
+    /**
+     * Handle the event.
+     */
+    public function handle(Registered $event): void
+    {
+        $event->user->createAsCustomer();
+    }
+}
+```
+
+Then register the listener in your `EventServiceProvider`:
+
+```php app/Providers/EventServiceProvider.php
+use App\Listeners\CreatePaystackCustomer;
+use Illuminate\Auth\Events\Registered;
+
+protected $listen = [
+    Registered::class => [
+        CreatePaystackCustomer::class,
+    ],
+];
+```
+
+## Retrieving Customer Data
+
+### Local Customer Record
+
+Access the local customer record using the `customer` relationship:
+
+```php
+$customer = $user->customer;
+
+// Access customer properties
+echo $customer->paystack_id;      // Paystack customer ID
+echo $customer->paystack_code;    // Paystack customer code
+echo $customer->trial_ends_at;    // Generic trial end date
+```
+
+### Paystack Customer Object
+
+Retrieve the full customer object from Paystack:
+
+```php
+$paystackCustomer = $user->asPaystackCustomer();
+
+// Access Paystack customer data
+echo $paystackCustomer['email'];
+echo $paystackCustomer['customer_code'];
+echo $paystackCustomer['authorizations']; // Payment methods
+```
+
+The `asPaystackCustomer` method makes an API call to Paystack and returns the complete customer object with all associated data.
+
+## Customer Model
+
+The `Customer` model is located at `veekthoven\Cashier\Customer` and has the following structure:
+
+### Database Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `paystack_id` | integer | Paystack customer ID |
+| `paystack_code` | string | Paystack customer code |
+| `trial_ends_at` | datetime | Generic trial period end date |
+| `billable_id` | integer | ID of the billable model |
+| `billable_type` | string | Class name of the billable model |
+
+### Relationships
+
+The Customer model uses a polymorphic relationship:
+
+```php
+// Get the billable model
+$user = $customer->billable;
+
+// Access from the billable model
+$customer = $user->customer;
+```
+
+## Generic Trials
+
+You can offer trial periods without collecting payment information upfront by setting the `trial_ends_at` field:
+
+```php
+use veekthoven\Cashier\Customer;
+
+$customer = Customer::create([
+    'billable_id' => $user->getKey(),
+    'billable_type' => $user->getMorphClass(),
+    'trial_ends_at' => now()->addDays(10),
+]);
+```
+
+<Warning>
+Make sure to add a date mutator for `trial_ends_at` to your Customer model definition.
+</Warning>
+
+### Checking Trial Status
+
+```php
+// Check if user is on a generic trial
+if ($user->onGenericTrial()) {
+    // User is within their "generic" trial period
+}
+
+// Check if trial has expired
+if ($user->hasExpiredGenericTrial()) {
+    // Trial period has ended
+}
+
+// Alternative syntax
+if ($user->onTrial()) {
+    // User is on trial (checks both generic and subscription trials)
+}
+```
+
+## Email Configuration
+
+By default, Cashier uses the `email` attribute from your billable model. Customize this by overriding the `paystackEmail` method:
+
+```php
+use veekthoven\Cashier\Billable;
+
+class User extends Authenticatable
+{
+    use Billable;
+
+    /**
+     * Get the email address for Paystack.
+     */
+    public function paystackEmail(): ?string
+    {
+        return $this->billing_email ?? $this->email;
+    }
+}
+```
+
+## Error Handling
+
+The `createAsCustomer` method throws an exception if the customer creation fails:
+
+```php
+try {
+    $user->createAsCustomer();
+} catch (\Exception $e) {
+    // Handle the error
+    logger()->error('Failed to create Paystack customer: ' . $e->getMessage());
+}
+```
+
+## Customer Verification
+
+Cashier provides an `assertCustomerExists` method to ensure a customer record exists before performing billing operations:
+
+```php
+// This is used internally by Cashier
+$this->assertCustomerExists();
+```
+
+If the customer doesn't exist, an `InvalidCustomer` exception is thrown.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Subscriptions" icon="repeat" href="/core-concepts/subscriptions">
+    Create recurring subscriptions for your customers
+  </Card>
+  <Card title="Payments" icon="credit-card" href="/core-concepts/payments">
+    Process one-time charges and refunds
+  </Card>
+</CardGroup>

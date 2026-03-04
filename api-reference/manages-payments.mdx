@@ -1,0 +1,212 @@
+---
+title: 'ManagesPayments'
+description: 'Methods for handling charges and refunds'
+---
+
+## Overview
+
+The `ManagesPayments` trait provides methods for making one-off charges and processing refunds. This trait is included in the `Billable` trait.
+
+## Methods
+
+### charge()
+
+Make a "one off" or "recurring" charge on the customer for the given amount.
+
+```php
+public function charge(int $amount, array $options = []): array
+```
+
+<ParamField path="amount" type="int" required>
+  The amount to charge in the smallest currency unit (e.g., kobo for NGN)
+</ParamField>
+
+<ParamField path="options" type="array" default="[]">
+  Additional options for the charge
+</ParamField>
+
+**Options:**
+
+<ParamField path="options.currency" type="string">
+  Currency code (defaults to `preferredCurrency()`)
+</ParamField>
+
+<ParamField path="options.reference" type="string">
+  Transaction reference (auto-generated if not provided)
+</ParamField>
+
+<ParamField path="options.authorization_code" type="string">
+  Authorization code for charging a saved card
+</ParamField>
+
+<ParamField path="options.card" type="array">
+  Card details for direct card charge
+</ParamField>
+
+<ParamField path="options.bank" type="array">
+  Bank details for bank transfer charge
+</ParamField>
+
+**Returns:** `array`
+
+Returns the Paystack API response array.
+
+**Throws:** `Exception` if Paystack is unable to perform the charge
+
+**Charge Behavior:**
+
+The method determines the charge type based on the options provided:
+
+1. **Authorization Code** - If `authorization_code` is provided, charges using a previously authorized payment method
+2. **Card/Bank Details** - If `card` or `bank` details are provided, performs a direct charge
+3. **Payment Request** - Otherwise, creates a payment request
+
+**Examples:**
+
+```php
+// Charge using saved authorization
+$user->charge(5000, [
+    'authorization_code' => 'AUTH_xxxxx'
+]);
+
+// Charge with card details
+$user->charge(10000, [
+    'card' => [
+        'number' => '4084084084084081',
+        'cvv' => '408',
+        'expiry_month' => '01',
+        'expiry_year' => '25'
+    ]
+]);
+
+// Create payment request
+$response = $user->charge(15000);
+```
+
+---
+
+### refund()
+
+Refund a customer for a charge.
+
+```php
+public function refund(string $transaction, array $options = []): array
+```
+
+<ParamField path="transaction" type="string" required>
+  The transaction reference or ID to refund
+</ParamField>
+
+<ParamField path="options" type="array" default="[]">
+  Additional options for the refund
+</ParamField>
+
+**Options:**
+
+<ParamField path="options.amount" type="int">
+  Amount to refund (partial refund). If not specified, refunds the full amount
+</ParamField>
+
+<ParamField path="options.merchant_note" type="string">
+  Internal note for the refund
+</ParamField>
+
+<ParamField path="options.customer_note" type="string">
+  Note that will be sent to the customer
+</ParamField>
+
+**Returns:** `array`
+
+Returns the Paystack API response array.
+
+**Examples:**
+
+```php
+// Full refund
+$user->refund('TRX_xxxxx');
+
+// Partial refund
+$user->refund('TRX_xxxxx', [
+    'amount' => 2500
+]);
+
+// Refund with notes
+$user->refund('TRX_xxxxx', [
+    'merchant_note' => 'Customer requested refund',
+    'customer_note' => 'Your refund has been processed'
+]);
+```
+
+---
+
+### preferredCurrency()
+
+Get the Paystack supported currency used by the entity.
+
+```php
+public function preferredCurrency(): string
+```
+
+**Returns:** `string`
+
+Returns the currency code configured in Cashier (typically 'NGN', 'GHS', 'ZAR', or 'USD').
+
+**Example:**
+
+```php
+$currency = $user->preferredCurrency(); // 'NGN'
+```
+
+## Usage Examples
+
+### One-Time Payment
+
+```php
+use App\Models\User;
+
+$user = User::find(1);
+
+try {
+    $response = $user->charge(5000, [
+        'authorization_code' => 'AUTH_xxxxx'
+    ]);
+    
+    if ($response['status']) {
+        // Payment successful
+        $reference = $response['data']['reference'];
+    }
+} catch (Exception $e) {
+    // Handle error
+    Log::error('Payment failed: ' . $e->getMessage());
+}
+```
+
+### Processing a Refund
+
+```php
+use App\Models\User;
+
+$user = User::find(1);
+
+$refundResponse = $user->refund('TRX_xxxxx', [
+    'amount' => 2500,
+    'customer_note' => 'Refund for cancelled order'
+]);
+
+if ($refundResponse['status']) {
+    // Refund processed successfully
+}
+```
+
+### Custom Currency Charge
+
+```php
+$user->charge(10000, [
+    'currency' => 'GHS',
+    'authorization_code' => 'AUTH_xxxxx'
+]);
+```
+
+## Source Location
+
+`src/Concerns/ManagesPayments.php:1-70`

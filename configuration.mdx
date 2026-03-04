@@ -1,0 +1,425 @@
+---
+title: Configuration
+description: Complete guide to configuring Laravel Cashier Paystack including environment variables, config files, and database migrations.
+---
+
+## Publishing the Configuration File
+
+After installing the package, you need to publish its configuration file to customize the settings.
+
+<Steps>
+
+<Step title="Publish Configuration">
+
+Run the following Artisan command to publish the configuration file:
+
+```bash
+php artisan vendor:publish --provider="veekthoven\Cashier\CashierServiceProvider"
+```
+
+This will create a new configuration file at `config/cashier-paystack.php` with sensible defaults.
+
+</Step>
+
+<Step title="Verify Configuration File">
+
+Check that the configuration file was created successfully:
+
+```bash
+ls -la config/cashier-paystack.php
+```
+
+</Step>
+
+</Steps>
+
+## Configuration File Structure
+
+The published configuration file contains the following options:
+
+```php config/cashier-paystack.php
+<?php
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Paystack Public Key
+    |--------------------------------------------------------------------------
+    |
+    | The Paystack public API key.
+    |
+    */
+
+    'public_key' => env('PAYSTACK_PUBLIC_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Paystack Secret Key From Dashboard
+    |--------------------------------------------------------------------------
+    |
+    | The Paystack secret is used to verify that the webhook
+    | requests are coming from Paystack. You can find your
+    | secret in the Paystack dashboard under the "API & Webhooks" section.
+    |
+    */
+
+    'secret_key' => env('PAYSTACK_SECRET_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Paystack Url Path
+    |--------------------------------------------------------------------------
+    |
+    | This is the base URI where webhook from Paystack will be responsded to.
+    | You must ensure to configure this route in your Paystack dashboard;
+    | however, you can modify this path as you see fit for your application.
+    |
+    */
+
+    'path' => env('PAYSTACK_PATH', 'paystack'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Paystack Merchant Email
+    |--------------------------------------------------------------------------
+    |
+    | This is an optional value for your Paystack account.
+    |
+    */
+
+    'merchant_email' => env('PAYSTACK_MERCHANT_EMAIL'),
+
+];
+```
+
+## Environment Variables
+
+Add the following environment variables to your `.env` file:
+
+<CodeGroup>
+
+```bash .env (Production)
+PAYSTACK_PUBLIC_KEY=pk_live_xxxxxxxxxxxxx
+PAYSTACK_SECRET_KEY=sk_live_xxxxxxxxxxxxx
+PAYSTACK_PATH=paystack
+PAYSTACK_MERCHANT_EMAIL=billing@yourcompany.com
+```
+
+```bash .env (Testing)
+PAYSTACK_PUBLIC_KEY=pk_test_xxxxxxxxxxxxx
+PAYSTACK_SECRET_KEY=sk_test_xxxxxxxxxxxxx
+PAYSTACK_PATH=paystack
+PAYSTACK_MERCHANT_EMAIL=billing@yourcompany.com
+```
+
+</CodeGroup>
+
+<Warning>
+**Security Important**: Never commit your `.env` file to version control. Your Paystack secret keys should remain private and secure.
+</Warning>
+
+### Getting Your Paystack API Keys
+
+<Steps>
+
+<Step title="Log in to Paystack Dashboard">
+Navigate to [https://dashboard.paystack.com](https://dashboard.paystack.com) and log in to your account.
+</Step>
+
+<Step title="Access API Settings">
+Go to **Settings** → **API Keys & Webhooks** in the dashboard sidebar.
+</Step>
+
+<Step title="Copy Your Keys">
+Copy your **Public Key** and **Secret Key** to your `.env` file.
+
+<Note>
+Use test keys (starting with `pk_test_` and `sk_test_`) during development, and switch to live keys (starting with `pk_live_` and `sk_live_`) in production.
+</Note>
+</Step>
+
+</Steps>
+
+### Configuration Options Explained
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PAYSTACK_PUBLIC_KEY` | Yes | Your Paystack public API key for client-side operations |
+| `PAYSTACK_SECRET_KEY` | Yes | Your Paystack secret key for server-side API calls and webhook verification |
+| `PAYSTACK_PATH` | No | Base URI path for webhooks (default: `paystack`) |
+| `PAYSTACK_MERCHANT_EMAIL` | No | Optional email address for your merchant account |
+
+## Database Migrations
+
+Laravel Cashier Paystack requires two database tables to store customer and subscription data.
+
+<Steps>
+
+<Step title="Review Migration Files">
+
+The package includes two migration files:
+
+**Paystack Customers Table**: Stores customer information and card details
+
+```php database/migrations/create_paystack_customers_table.php
+Schema::create('paystack_customers', function (Blueprint $table) {
+    $table->id();
+
+    $table->unsignedBigInteger('billable_id');
+    $table->string('billable_type');
+
+    $table->string('paystack_id')->nullable();
+    $table->string('paystack_code')->nullable();
+    $table->string('card_brand')->nullable();
+    $table->string('card_last_four', 4)->nullable();
+
+    $table->timestamp('trial_ends_at')->nullable();
+    $table->timestamps();
+
+    $table->unique(['billable_id', 'billable_type']);
+});
+```
+
+**Paystack Subscriptions Table**: Stores subscription details
+
+```php database/migrations/create_paystack_subscriptions_table.php
+Schema::create('paystack_subscriptions', function (Blueprint $table) {
+    $table->id();
+
+    $table->unsignedBigInteger('billable_id');
+    $table->string('billable_type');
+
+    $table->string('type');
+    $table->string('paystack_id')->nullable();
+    $table->string('paystack_code')->nullable();
+    $table->string('paystack_plan');
+    $table->integer('quantity');
+
+    $table->timestamp('trial_ends_at')->nullable();
+    $table->timestamp('ends_at')->nullable();
+
+    $table->timestamps();
+
+    $table->index(['billable_id', 'billable_type']);
+});
+```
+
+</Step>
+
+<Step title="Run Migrations">
+
+Execute the migrations to create the required tables:
+
+```bash
+php artisan migrate
+```
+
+You should see output similar to:
+
+```
+Migrating: 2023_11_04_000001_create_paystack_customers_table
+Migrated:  2023_11_04_000001_create_paystack_customers_table (45.23ms)
+Migrating: 2023_11_04_000002_create_paystack_subscriptions_table
+Migrated:  2023_11_04_000002_create_paystack_subscriptions_table (38.67ms)
+```
+
+</Step>
+
+</Steps>
+
+### Database Tables Explained
+
+#### Paystack Customers Table
+
+This table stores Paystack customer information linked to your billable models:
+
+- **billable_id** and **billable_type**: Polymorphic relationship to your User model
+- **paystack_id**: Paystack's customer ID
+- **paystack_code**: Paystack's customer code
+- **card_brand**: Brand of the stored card (Visa, Mastercard, etc.)
+- **card_last_four**: Last four digits of the card
+- **trial_ends_at**: When the customer's trial period ends
+
+#### Paystack Subscriptions Table
+
+This table tracks all subscription records:
+
+- **billable_id** and **billable_type**: Links to the customer
+- **type**: Subscription name (e.g., 'default', 'premium')
+- **paystack_id**: Paystack's subscription ID
+- **paystack_code**: Paystack's subscription code
+- **paystack_plan**: Paystack plan code (e.g., PLN_xxxxx)
+- **quantity**: Subscription quantity
+- **trial_ends_at**: Trial period end date
+- **ends_at**: Subscription end date (for cancelled subscriptions)
+
+## Configuring the Billable Model
+
+Add the `Billable` trait to your User model (or any model that will be making payments).
+
+<Steps>
+
+<Step title="Import the Billable Trait">
+
+Open your `app/Models/User.php` file and add the trait:
+
+```php app/Models/User.php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use veekthoven\Cashier\Billable;
+
+class User extends Authenticatable
+{
+    use Billable;
+
+    // ... rest of your model
+}
+```
+
+</Step>
+
+<Step title="Verify the Integration">
+
+The `Billable` trait provides various methods for billing operations:
+
+- `newSubscription()` - Create new subscriptions
+- `subscribed()` - Check subscription status
+- `charge()` - Make one-time charges
+- `invoiceFor()` - Create invoices
+- `cards()` - Retrieve payment methods
+- `createAsCustomer()` - Create Paystack customer
+
+You can now use these methods on your User model instances.
+
+</Step>
+
+</Steps>
+
+## Currency Configuration
+
+By default, Laravel Cashier Paystack uses Nigerian Naira (NGN). You can change the currency in a service provider.
+
+<Steps>
+
+<Step title="Open AppServiceProvider">
+
+Edit `app/Providers/AppServiceProvider.php`:
+
+```php app/Providers/AppServiceProvider.php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use veekthoven\Cashier\Cashier;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        // Use Nigerian Naira (default)
+        Cashier::useCurrency('ngn', '₦');
+        
+        // Or use Ghanaian Cedi
+        // Cashier::useCurrency('ghs', 'GH₵');
+    }
+}
+```
+
+</Step>
+
+</Steps>
+
+<Note>
+Remember that Paystack accepts amounts in the smallest currency unit (kobo for NGN, pesewas for GHS). For example, ₦100.00 should be passed as `10000`.
+</Note>
+
+## Webhook Configuration
+
+Configure webhooks to receive real-time notifications from Paystack.
+
+<Steps>
+
+<Step title="Set Up Webhook Route">
+
+The package automatically registers a webhook route at `/paystack/webhook`. If you need a custom path, set it in your `.env` file:
+
+```bash
+PAYSTACK_PATH=custom-webhook-path
+```
+
+</Step>
+
+<Step title="Disable CSRF Protection for Webhooks">
+
+**For Laravel 10 and earlier**, edit `app/Http/Middleware/VerifyCsrfToken.php`:
+
+```php app/Http/Middleware/VerifyCsrfToken.php
+protected $except = [
+    'paystack/*',
+];
+```
+
+**For Laravel 11 and later**, edit `bootstrap/app.php`:
+
+```php bootstrap/app.php
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->validateCsrfTokens(
+            except: ['paystack/*']
+        );
+    })
+    ->create();
+```
+
+</Step>
+
+<Step title="Configure Webhook in Paystack Dashboard">
+
+1. Go to your [Paystack Dashboard](https://dashboard.paystack.com)
+2. Navigate to **Settings** → **API Keys & Webhooks**
+3. Add your webhook URL: `https://yourdomain.com/paystack/webhook`
+4. Save the configuration
+
+<Warning>
+Ensure your webhook URL is publicly accessible. Paystack needs to reach this endpoint to send notifications.
+</Warning>
+
+</Step>
+
+</Steps>
+
+## Testing Your Configuration
+
+Verify that everything is configured correctly:
+
+```php
+// In tinker or a test route
+php artisan tinker
+
+$user = User::first();
+$user->createAsCustomer();
+
+// If successful, the user now has a Paystack customer ID
+echo $user->paystack_id;
+```
+
+If this works without errors, your configuration is complete!
+
+## Next Steps
+
+With configuration complete, you're ready to start using Laravel Cashier Paystack:
+
+- Learn how to create subscriptions
+- Process one-time charges
+- Generate invoices
+- Handle webhooks
+- Manage customer payment methods
+
+<Note>
+Keep your Paystack secret keys secure and never expose them in client-side code or version control.
+</Note>

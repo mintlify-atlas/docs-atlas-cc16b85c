@@ -1,0 +1,388 @@
+---
+title: Single Charges
+description: Make one-time charges and create invoices for your customers using Laravel Cashier Paystack
+---
+
+Besides recurring subscriptions, Laravel Cashier Paystack allows you to make one-time charges against your customers' payment methods and generate invoices with PDF receipts.
+
+## Simple Charges
+
+To make a one-off charge against a customer, use the `charge` method on a billable model instance.
+
+<Note>
+  When using Paystack, the `charge` method accepts amounts in the lowest currency denomination. For Nigerian Naira (NGN), this means kobo. For example, ₦100.00 = 10000 kobo.
+</Note>
+
+### Basic Charge Example
+
+```php
+// Charge ₦100.00 (10000 kobo)
+$response = $user->charge(10000);
+```
+
+If the charge is successful, the full Paystack response will be returned. If it fails, an exception will be thrown.
+
+### Handling Charge Failures
+
+Always wrap charges in a try-catch block to handle potential failures:
+
+```php
+try {
+    // Charge ₦100.00 (10000 kobo)
+    $response = $user->charge(10000);
+    
+    // Charge was successful
+    $reference = $response['data']['reference'];
+    $status = $response['data']['status'];
+    
+    // Store transaction details, fulfill order, etc.
+} catch (Exception $e) {
+    // Charge failed
+    return back()->withErrors(['payment' => $e->getMessage()]);
+}
+```
+
+## Charge Options
+
+The `charge` method accepts an options array as its second argument, allowing you to pass additional parameters to Paystack.
+
+### Custom Reference
+
+```php
+$response = $user->charge(10000, [
+    'reference' => 'ORDER-' . time(),
+]);
+```
+
+### Using a Specific Authorization
+
+Charge a specific card by providing the authorization code:
+
+```php
+$cards = $user->cards();
+$card = $cards->first();
+
+$response = $user->charge(10000, [
+    'authorization_code' => $card->authorization_code,
+]);
+```
+
+<Note>
+  If you don't specify an authorization code, Paystack will automatically use the customer's most recent authorization.
+</Note>
+
+### Adding Metadata
+
+```php
+$response = $user->charge(10000, [
+    'metadata' => [
+        'order_id' => 12345,
+        'customer_note' => 'Express shipping',
+    ],
+]);
+```
+
+## Charge Implementation
+
+Here's how the `charge` method works internally:
+
+<Accordion title="View charge method source code">
+  ```php
+  // From src/Concerns/ManagesPayments.php
+  public function charge($amount, array $options = [])
+  {
+      $options = array_merge([
+          'currency' => $this->preferredCurrency(),
+          'reference' => ReferenceGenerator::generate(),
+      ], $options);
+
+      $options['email'] = $this->email;
+      $options['amount'] = intval($amount);
+
+      if (array_key_exists('authorization_code', $options)) {
+          $response = Paystack::chargeAuthorization($options);
+      } elseif (array_key_exists('card', $options) || array_key_exists('bank', $options)) {
+          $response = Paystack::charge($options);
+      } else {
+          $response = Paystack::makePaymentRequest($options);
+      }
+
+      if (! $response['status']) {
+          throw new Exception('Paystack was unable to perform a charge: '.$response['message']);
+      }
+
+      return $response;
+  }
+  ```
+</Accordion>
+
+## Invoicing
+
+### Creating Invoices
+
+Sometimes you need to make a one-time charge and generate an invoice with a PDF receipt. Use the `invoiceFor` method:
+
+```php
+// Charge ₦2,000.00 and create an invoice
+$response = $user->invoiceFor('One Time Fee', 200000, [
+    'due_date' => now()->addDays(7),
+]);
+```
+
+<Warning>
+  The `invoiceFor` method requires a `due_date` option. If not provided, an `InvalidArgumentException` will be thrown.
+</Warning>
+
+### Invoice with Line Items and Tax
+
+```php
+$response = $user->invoiceFor('Premium Package', 50000, [
+    'due_date' => now()->addDays(14),
+    'line_items' => [
+        [
+            'name' => 'Setup Fee',
+            'amount' => 10000,
+        ],
+        [
+            'name' => 'Monthly Subscription',
+            'amount' => 40000,
+        ],
+    ],
+    'tax' => [
+        [
+            'name' => 'VAT',
+            'amount' => 2000,
+        ],
+    ],
+]);
+```
+
+### Using the Tab Method
+
+The `invoiceFor` method is an alias for the `tab` method:
+
+```php
+// These are equivalent
+$user->invoiceFor('Service Fee', 50000, ['due_date' => now()->addWeek()]);
+$user->tab('Service Fee', 50000, ['due_date' => now()->addWeek()]);
+```
+
+<Accordion title="View invoiceFor implementation">
+  ```php
+  // From src/Concerns/ManagesInvoices.php
+  public function invoiceFor($description, $amount, array $options = [])
+  {
+      return $this->tab($description, $amount, $options);
+  }
+
+  public function tab($description, $amount, array $options = [])
+  {
+      if (! $this->customer->paystack_id) {
+          throw new InvalidArgumentException(
+              class_basename($this).' is not a Paystack customer. See the createAsCustomer method.'
+          );
+      }
+
+      if (! array_key_exists('due_date', $options)) {
+          throw new InvalidArgumentException('No due date provided.');
+      }
+
+      $options = array_merge([
+          'customer' => $this->customer->paystack_id,
+          'amount' => $amount,
+          'currency' => $this->preferredCurrency(),
+          'description' => $description,
+      ], $options);
+
+      $options['due_date'] = Carbon::parse($options['due_date'])->format('c');
+
+      return Paystack::createInvoice($options);
+  }
+  ```
+</Accordion>
+
+## Retrieving Invoices
+
+### Get All Invoices
+
+Retrieve all invoices for a customer:
+
+```php
+$invoices = $user->invoices();
+
+foreach ($invoices as $invoice) {
+    echo $invoice['description'];
+    echo $invoice['amount'];
+    echo $invoice['status'];
+}
+```
+
+### Get Only Pending Invoices
+
+```php
+$pendingInvoices = $user->invoicesOnlyPending();
+```
+
+### Get Only Paid Invoices
+
+```php
+$paidInvoices = $user->invoicesOnlyPaid();
+```
+
+### Find a Specific Invoice
+
+```php
+$invoice = $user->findInvoice($invoiceId);
+
+if ($invoice) {
+    echo $invoice->total();
+    echo $invoice->date()->toFormattedDateString();
+}
+```
+
+Or use `findInvoiceOrFail` to throw a 404 exception if the invoice isn't found:
+
+```php
+$invoice = $user->findInvoiceOrFail($invoiceId);
+```
+
+## Displaying Invoices
+
+Here's an example of listing invoices in a view:
+
+```php
+// In your controller
+public function invoices()
+{
+    return view('billing.invoices', [
+        'invoices' => auth()->user()->invoices(),
+    ]);
+}
+```
+
+```blade
+<!-- In your view -->
+<table>
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach ($invoices as $invoice)
+            <tr>
+                <td>{{ $invoice->date()->toFormattedDateString() }}</td>
+                <td>{{ $invoice->total() }}</td>
+                <td>{{ $invoice['status'] }}</td>
+                <td>
+                    <a href="/user/invoice/{{ $invoice->id }}">
+                        Download
+                    </a>
+                </td>
+            </tr>
+        @endforeach
+    </tbody>
+</table>
+```
+
+## Generating Invoice PDFs
+
+Generate a PDF download of an invoice using the `downloadInvoice` method:
+
+```php
+use Illuminate\Http\Request;
+
+Route::get('user/invoice/{invoice}', function (Request $request, $invoiceId) {
+    return $request->user()->downloadInvoice($invoiceId, [
+        'vendor' => 'Your Company',
+        'product' => 'Your Product',
+    ]);
+});
+```
+
+This automatically generates the proper HTTP response to send the PDF download to the browser.
+
+### Customizing Invoice PDFs
+
+You can customize the invoice appearance by passing additional data:
+
+```php
+return $user->downloadInvoice($invoiceId, [
+    'vendor' => 'Acme Corporation',
+    'product' => 'Premium Subscription',
+    'street' => '123 Main Street',
+    'location' => 'Lagos, Nigeria',
+    'phone' => '+234 123 456 7890',
+]);
+```
+
+## Refunding Charges
+
+If you need to refund a charge, use the `refund` method with the Paystack transaction reference:
+
+```php
+$charge = $user->charge(10000);
+$reference = $charge['data']['reference'];
+
+// Refund the charge
+$refund = $user->refund($reference);
+```
+
+### Partial Refunds
+
+```php
+// Refund ₦50.00 of a ₦100.00 charge
+$refund = $user->refund($reference, [
+    'amount' => 5000, // Amount in kobo
+]);
+```
+
+<Accordion title="View refund implementation">
+  ```php
+  // From src/Concerns/ManagesPayments.php
+  public function refund($transaction, array $options = [])
+  {
+      $options['transaction'] = $transaction;
+      $response = Paystack::refund($options);
+      return $response;
+  }
+  ```
+</Accordion>
+
+## Currency Considerations
+
+Charges and invoices automatically use the customer's preferred currency, which defaults to the currency configured in your Cashier settings:
+
+```php
+// Returns the configured currency (e.g., "NGN")
+$currency = $user->preferredCurrency();
+```
+
+See the [Currency Configuration](/guides/currency-configuration) guide for more information on multi-currency support.
+
+## Best Practices
+
+<Steps>
+  <Step title="Always use try-catch blocks">
+    Wrap all charge operations in exception handling to gracefully handle failures.
+  </Step>
+
+  <Step title="Store transaction references">
+    Save the Paystack reference from successful charges for future reference and reconciliation.
+  </Step>
+
+  <Step title="Validate amounts">
+    Ensure amounts are positive integers in the lowest currency denomination.
+  </Step>
+
+  <Step title="Provide meaningful descriptions">
+    Use clear, descriptive text for invoices that customers will understand.
+  </Step>
+
+  <Step title="Set appropriate due dates">
+    When creating invoices, set realistic due dates and send reminders.
+  </Step>
+</Steps>

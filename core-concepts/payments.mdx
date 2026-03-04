@@ -1,0 +1,345 @@
+---
+title: Payments
+description: Process single charges, refunds, and manage payment methods
+---
+
+## Introduction
+
+In addition to subscriptions, Cashier allows you to make one-time charges against your customers. You can also refund charges and manage payment methods.
+
+## Single Charges
+
+### Simple Charge
+
+Make a one-off charge against a customer using the `charge` method:
+
+```php
+// Paystack accepts charges in kobo for Naira
+$response = $user->charge(10000); // ₦100.00
+```
+
+<Warning>
+Paystack accepts amounts in the lowest currency denomination. For Naira (NGN), this is kobo (100 kobo = ₦1). For Ghana Cedis (GHS), this is pesewas.
+</Warning>
+
+### Charge with Authorization Code
+
+Charge a customer using a specific card authorization:
+
+```php
+$user->charge(10000, [
+    'authorization_code' => 'AUTH_xxxxxxxxxx',
+]);
+```
+
+### Charge with Card Details
+
+Initialize a charge with card or bank details:
+
+```php
+$response = $user->charge(10000, [
+    'card' => [
+        'number' => '4084084084084081',
+        'cvv' => '408',
+        'expiry_month' => '12',
+        'expiry_year' => '25',
+    ],
+]);
+```
+
+### Initialize Payment Request
+
+If no authorization or card details are provided, a payment request is initialized:
+
+```php
+$response = $user->charge(10000);
+
+// Redirect to payment page
+return redirect($response['data']['authorization_url']);
+
+// Or use the access code
+$accessCode = $response['data']['access_code'];
+```
+
+### Additional Options
+
+Pass additional options to customize the charge:
+
+```php
+$user->charge(10000, [
+    'currency' => 'GHS',
+    'reference' => 'ORD-' . time(),
+    'metadata' => [
+        'order_id' => 12345,
+        'customer_note' => 'Express delivery',
+    ],
+]);
+```
+
+### Error Handling
+
+The `charge` method throws an exception if the charge fails:
+
+```php
+try {
+    $response = $user->charge(10000);
+    
+    // Charge successful
+    $reference = $response['data']['reference'];
+    
+} catch (\Exception $e) {
+    // Handle the error
+    return back()->with('error', 'Payment failed: ' . $e->getMessage());
+}
+```
+
+## Charge with Invoice
+
+Create a one-time charge and generate an invoice for the customer:
+
+```php
+// Basic invoice
+$user->invoiceFor('One Time Fee', 200000, [
+    'due_date' => now()->addDays(7),
+]);
+
+// With line items and tax
+$user->invoiceFor('Stickers', 50000, [
+    'due_date' => now()->addDays(7),
+    'line_items' => [
+        [
+            'name' => 'Premium Stickers',
+            'amount' => 30000,
+        ],
+        [
+            'name' => 'Standard Stickers',
+            'amount' => 20000,
+        ],
+    ],
+    'tax' => [
+        ['name' => 'VAT', 'amount' => 2000],
+    ],
+]);
+```
+
+<Note>
+The `invoiceFor` method is an alias for the `tab` method and requires a `due_date` to be specified.
+</Note>
+
+## Refunding Charges
+
+Refund a customer for a charge using the transaction reference:
+
+```php
+// Make a charge
+$response = $user->charge(10000);
+$reference = $response['data']['reference'];
+
+// Refund the charge
+$user->refund($reference);
+```
+
+With additional options:
+
+```php
+$user->refund($reference, [
+    'amount' => 5000, // Partial refund
+    'merchant_note' => 'Customer requested refund',
+]);
+```
+
+## Payment Methods
+
+### Retrieving Payment Methods
+
+Get all card authorizations for a customer:
+
+```php
+$cards = $user->cards();
+
+foreach ($cards as $card) {
+    echo $card['last4'];           // Last 4 digits
+    echo $card['brand'];           // Card brand (Visa, Mastercard)
+    echo $card['exp_month'];       // Expiry month
+    echo $card['exp_year'];        // Expiry year
+    echo $card['authorization_code']; // Authorization code
+}
+```
+
+### Deleting Payment Methods
+
+Delete a specific card:
+
+```php
+foreach ($user->cards() as $card) {
+    if ($card['authorization_code'] === $specificAuthCode) {
+        $card->delete();
+    }
+}
+```
+
+Delete all cards for a customer:
+
+```php
+$user->deleteCards();
+```
+
+## Currency Configuration
+
+By default, charges use the currency configured in your application. You can customize this per user:
+
+```php
+use veekthoven\Cashier\Billable;
+
+class User extends Authenticatable
+{
+    use Billable;
+
+    /**
+     * Get the preferred currency for the user.
+     */
+    public function preferredCurrency()
+    {
+        return $this->currency ?? 'NGN';
+    }
+}
+```
+
+Set the application-wide currency in a service provider:
+
+```php app/Providers/AppServiceProvider.php
+use veekthoven\Cashier\Cashier;
+
+public function boot()
+{
+    // For Naira
+    Cashier::useCurrency('ngn', '₦');
+    
+    // For Ghana Cedis
+    Cashier::useCurrency('ghs', 'GH₵');
+}
+```
+
+## Reference Generation
+
+Charges automatically generate a unique reference. Cashier uses the `ReferenceGenerator` class to create references:
+
+```php
+use veekthoven\Cashier\ReferenceGenerator;
+
+$reference = ReferenceGenerator::generate();
+```
+
+You can override this by passing your own reference:
+
+```php
+$user->charge(10000, [
+    'reference' => 'ORD-' . uniqid(),
+]);
+```
+
+## Payment Flow Example
+
+Complete payment flow with verification:
+
+```php
+// 1. Initialize payment
+public function initializePayment(Request $request)
+{
+    try {
+        $response = $request->user()->charge(10000, [
+            'metadata' => [
+                'order_id' => $request->order_id,
+            ],
+        ]);
+        
+        return redirect($response['data']['authorization_url']);
+        
+    } catch (\Exception $e) {
+        return back()->with('error', 'Payment initialization failed');
+    }
+}
+
+// 2. Verify payment (callback)
+public function verifyPayment(Request $request)
+{
+    $reference = $request->reference;
+    
+    // Verify with Paystack
+    $response = Paystack::verifyTransaction($reference);
+    
+    if ($response['data']['status'] === 'success') {
+        // Payment successful
+        // Update order status, etc.
+        
+        return redirect('/dashboard')->with('success', 'Payment successful');
+    }
+    
+    return redirect('/billing')->with('error', 'Payment verification failed');
+}
+```
+
+## Webhooks for Payments
+
+Handle payment webhooks to respond to charge events:
+
+```php app/Http/Controllers/WebhookController.php
+use veekthoven\Cashier\Http\Controllers\WebhookController as CashierController;
+
+class WebhookController extends CashierController
+{
+    /**
+     * Handle charge success.
+     */
+    public function handleChargeSuccess($payload)
+    {
+        $reference = $payload['data']['reference'];
+        $amount = $payload['data']['amount'];
+        
+        // Update your application
+        
+        return response('Webhook handled', 200);
+    }
+}
+```
+
+## Testing Payments
+
+Use Paystack test cards for development:
+
+```php
+// Successful payment
+$user->charge(10000, [
+    'card' => [
+        'number' => '4084084084084081',
+        'cvv' => '408',
+        'expiry_month' => '12',
+        'expiry_year' => '25',
+    ],
+]);
+
+// Failed payment
+$user->charge(10000, [
+    'card' => [
+        'number' => '5060666666666666666',
+        'cvv' => '123',
+        'expiry_month' => '12',
+        'expiry_year' => '25',
+    ],
+]);
+```
+
+<Tip>
+Refer to [Paystack's test cards documentation](https://paystack.com/docs/payments/test-payments) for a complete list of test cards.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Invoices" icon="file-invoice" href="/core-concepts/invoices">
+    Learn about invoice management and PDF generation
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/advanced/webhooks">
+    Handle Paystack webhook events
+  </Card>
+</CardGroup>

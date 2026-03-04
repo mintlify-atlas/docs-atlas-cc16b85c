@@ -1,0 +1,125 @@
+---
+title: 'Customer'
+description: 'API reference for the Customer model'
+---
+
+The `Customer` model represents a Paystack customer in Laravel Cashier Paystack.
+
+## Properties
+
+### `paystack_id`
+
+The Paystack customer ID.
+
+### `billable_id`
+
+The ID of the billable model (e.g., User ID).
+
+### `billable_type`
+
+The class name of the billable model (e.g., `App\Models\User`).
+
+### `trial_ends_at`
+
+The date and time when the generic trial period ends.
+
+### `created_at`
+
+The date and time when the customer record was created.
+
+### `updated_at`
+
+The date and time when the customer record was last updated.
+
+## Relationships
+
+### `billable()`
+
+Get the billable model related to the customer.
+
+```php
+public function billable(): MorphTo
+```
+
+**Example:**
+
+```php
+$customer = Customer::find(1);
+$user = $customer->billable;
+echo $user->email;
+```
+
+## Trial Methods
+
+### `onGenericTrial()`
+
+Determine if the customer is on a "generic" trial at the model level.
+
+```php
+public function onGenericTrial(): bool
+```
+
+**Returns:** `true` if the customer is currently on a generic trial, `false` otherwise.
+
+**Example:**
+
+```php
+$customer = Customer::find(1);
+
+if ($customer->onGenericTrial()) {
+    echo 'Customer is on a generic trial';
+}
+```
+
+### `hasExpiredGenericTrial()`
+
+Determine if the customer has an expired "generic" trial at the model level.
+
+```php
+public function hasExpiredGenericTrial(): bool
+```
+
+**Returns:** `true` if the customer has an expired generic trial, `false` otherwise.
+
+**Example:**
+
+```php
+$customer = Customer::find(1);
+
+if ($customer->hasExpiredGenericTrial()) {
+    echo 'Customer trial has expired';
+}
+```
+
+## Usage Examples
+
+### Checking Trial Status
+
+```php
+use veekthoven\Cashier\Customer;
+
+$customer = Customer::where('billable_id', $user->id)->first();
+
+if ($customer->onGenericTrial()) {
+    // Customer is on trial
+    $daysRemaining = now()->diffInDays($customer->trial_ends_at);
+    echo "Trial ends in {$daysRemaining} days";
+} elseif ($customer->hasExpiredGenericTrial()) {
+    // Trial has expired
+    echo 'Your trial has expired. Please subscribe to continue.';
+}
+```
+
+### Accessing Billable Model
+
+```php
+$customer = Customer::find(1);
+$user = $customer->billable;
+
+// Access user properties
+echo $user->name;
+echo $user->email;
+
+// Access user subscriptions
+$subscriptions = $user->subscriptions;
+```

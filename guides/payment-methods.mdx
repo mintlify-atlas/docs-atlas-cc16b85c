@@ -1,0 +1,234 @@
+---
+title: Payment Methods
+description: Manage customer payment methods including cards and authorizations in Laravel Cashier Paystack
+---
+
+Laravel Cashier Paystack provides methods to manage customer payment methods, including retrieving card authorizations, checking card validity, and deleting payment methods.
+
+## Retrieving Payment Methods
+
+The `cards` method on the Billable model returns a collection of card payment authorizations for a customer.
+
+### Get All Cards
+
+```php
+$cards = $user->cards();
+
+foreach ($cards as $card) {
+    echo $card->brand;              // e.g., "Visa"
+    echo $card->last4;              // Last 4 digits
+    echo $card->exp_month;          // Expiration month
+    echo $card->exp_year;           // Expiration year
+    echo $card->authorization_code; // Paystack auth code
+}
+```
+
+<Note>
+  The `cards()` method only returns payment methods where the channel is `'card'`. Other authorization types are filtered out.
+</Note>
+
+### How It Works
+
+The `cards` method retrieves authorizations from the customer's Paystack profile and filters for card-based payment methods:
+
+<Accordion title="View ManagesCards source code">
+  ```php
+  // From src/Concerns/ManagesCards.php
+  public function cards($parameters = [])
+  {
+      $cards = [];
+      $paystackAuthorizations = $this->asPaystackCustomer()['authorizations'];
+      
+      if (! is_null($paystackAuthorizations)) {
+          foreach ($paystackAuthorizations as $card) {
+              if ($card['channel'] == 'card') {
+                  $cards[] = $card;
+              }
+          }
+      }
+
+      return new Collection($cards);
+  }
+  ```
+</Accordion>
+
+## Card Object Properties
+
+Each card in the collection is a `veekthoven\Cashier\Card` instance with the following properties:
+
+- `authorization_code` - The Paystack authorization code
+- `brand` - Card brand (Visa, Mastercard, etc.)
+- `last4` - Last 4 digits of the card
+- `exp_month` - Expiration month
+- `exp_year` - Expiration year
+- `channel` - Always "card" for card payments
+- `reusable` - Whether the authorization can be reused
+
+## Checking Card Validity
+
+Before charging a card, you can verify that it has sufficient funds for a payment:
+
+```php
+$cards = $user->cards();
+$card = $cards->first();
+
+// Amount in kobo for NGN (or lowest currency unit)
+$amount = 50000; // ₦500.00
+
+try {
+    $result = $card->check($amount);
+    
+    if ($result['status']) {
+        // Card can be charged
+    }
+} catch (Exception $e) {
+    // Card is not reusable or check failed
+}
+```
+
+<Warning>
+  The `check` method will throw an exception if the payment method is no longer reusable.
+</Warning>
+
+<Accordion title="View Card check method implementation">
+  ```php
+  // From src/Card.php
+  public function check($amount)
+  {
+      $data = [];
+      $data['email'] = $this->billable->email;
+      $data['amount'] = $amount;
+      $data['authorization_code'] = $this->card->authorization_code;
+
+      if ($this->isReusable) {
+          return Paystack::checkAuthorization($data);
+      }
+
+      throw new Exception('Payment Method is no longer reusable.');
+  }
+  ```
+</Accordion>
+
+## Deleting Payment Methods
+
+### Delete a Specific Card
+
+To delete a single card authorization:
+
+```php
+$cards = $user->cards();
+$card = $cards->first();
+
+$card->delete();
+```
+
+This deactivates the authorization in Paystack, preventing it from being used for future charges.
+
+### Delete All Cards
+
+To delete all card payment authorizations for a customer:
+
+```php
+$user->deleteCards();
+```
+
+<Steps>
+  <Step title="Retrieve all cards">
+    The `deleteCards` method retrieves all card authorizations for the customer.
+  </Step>
+  
+  <Step title="Delete each card">
+    It iterates through each card and calls the `delete` method:
+
+    ```php
+    // From src/Concerns/ManagesCards.php
+    public function deleteCards()
+    {
+        $this->cards()->each(function (Card $card) {
+            $card->delete();
+        });
+    }
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Deleting payment methods is irreversible. The customer will need to authorize a new card to make future payments.
+</Warning>
+
+## Using Payment Methods for Charges
+
+Once you have a customer's card authorization, you can use it to make charges:
+
+### Charge with Authorization Code
+
+```php
+$cards = $user->cards();
+$card = $cards->first();
+
+// Charge using the authorization code
+$response = $user->charge(50000, [
+    'authorization_code' => $card->authorization_code,
+]);
+```
+
+### Charge with Most Recent Authorization
+
+If you don't specify an authorization code, Paystack will use the customer's most recent authorization:
+
+```php
+// Uses most recent authorization automatically
+$response = $user->charge(50000);
+```
+
+<Note>
+  Amounts are always specified in the smallest currency unit (kobo for NGN, pesewas for GHS, cents for USD).
+</Note>
+
+## Displaying Cards to Users
+
+Here's an example of how to display a customer's payment methods in a view:
+
+```php
+// In your controller
+public function paymentMethods()
+{
+    $cards = auth()->user()->cards();
+    
+    return view('billing.payment-methods', [
+        'cards' => $cards,
+    ]);
+}
+```
+
+```blade
+<!-- In your view -->
+<div class="payment-methods">
+    @forelse($cards as $card)
+        <div class="card-item">
+            <span>{{ $card->brand }} ending in {{ $card->last4 }}</span>
+            <span>Expires {{ $card->exp_month }}/{{ $card->exp_year }}</span>
+            
+            <form method="POST" action="/payment-methods/{{ $card->authorization_code }}">
+                @csrf
+                @method('DELETE')
+                <button type="submit">Remove</button>
+            </form>
+        </div>
+    @empty
+        <p>No payment methods on file.</p>
+    @endforelse
+</div>
+```
+
+## Getting the Raw Paystack Authorization
+
+If you need access to the raw Paystack authorization object:
+
+```php
+$card = $user->cards()->first();
+$paystackAuth = $card->asPaystackAuthorization();
+
+// Access all Paystack authorization properties
+var_dump($paystackAuth);
+```

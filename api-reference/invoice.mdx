@@ -1,0 +1,449 @@
+---
+title: 'Invoice'
+description: 'API reference for the Invoice class'
+---
+
+The `Invoice` class provides methods for working with Paystack payment requests (invoices) in Laravel Cashier Paystack.
+
+## Constructor
+
+### `__construct()`
+
+Create a new invoice instance.
+
+```php
+public function __construct($owner, $invoice)
+```
+
+**Parameters:**
+
+- `$owner` (Model): The billable model instance
+- `$invoice` (array): The Paystack invoice data
+
+**Example:**
+
+```php
+$invoice = new Invoice($user, $paystackInvoiceData);
+```
+
+## Date Methods
+
+### `date()`
+
+Get a Carbon date for the invoice.
+
+```php
+public function date($timezone = null): Carbon
+```
+
+**Parameters:**
+
+- `$timezone` (DateTimeZone|string|null): The timezone to use
+
+**Example:**
+
+```php
+$invoiceDate = $invoice->date();
+echo $invoiceDate->format('F d, Y');
+
+// With timezone
+$invoiceDate = $invoice->date('America/New_York');
+```
+
+## Amount Methods
+
+### `total()`
+
+Get the total amount that was paid (or will be paid).
+
+```php
+public function total(): string
+```
+
+**Example:**
+
+```php
+echo $invoice->total(); // ₦10,000.00
+```
+
+### `rawTotal()`
+
+Get the raw total amount that was paid (or will be paid).
+
+```php
+public function rawTotal(): float
+```
+
+**Example:**
+
+```php
+$amount = $invoice->rawTotal(); // 1000000 (in kobo)
+```
+
+### `subtotal()`
+
+Get the total of the invoice (before discounts).
+
+```php
+public function subtotal(): string
+```
+
+**Example:**
+
+```php
+echo $invoice->subtotal(); // ₦12,000.00
+```
+
+### `startingBalance()`
+
+Get the starting balance for the invoice.
+
+```php
+public function startingBalance(): string
+```
+
+**Example:**
+
+```php
+if ($invoice->hasStartingBalance()) {
+    echo $invoice->startingBalance();
+}
+```
+
+### `rawStartingBalance()`
+
+Get the raw invoice balance amount.
+
+```php
+public function rawStartingBalance(): float
+```
+
+**Example:**
+
+```php
+$balance = $invoice->rawStartingBalance();
+```
+
+### `hasStartingBalance()`
+
+Determine if the account had a starting balance.
+
+```php
+public function hasStartingBalance(): bool
+```
+
+**Example:**
+
+```php
+if ($invoice->hasStartingBalance()) {
+    // Invoice has a starting balance
+}
+```
+
+## Discount Methods
+
+### `hasDiscount()`
+
+Determine if the invoice has a discount.
+
+```php
+public function hasDiscount(): bool
+```
+
+**Example:**
+
+```php
+if ($invoice->hasDiscount()) {
+    echo 'Discount applied!';
+}
+```
+
+### `discount()`
+
+Get the discount amount.
+
+```php
+public function discount(): string
+```
+
+**Example:**
+
+```php
+if ($invoice->hasDiscount()) {
+    echo $invoice->discount(); // ₦2,000.00
+}
+```
+
+### `discountIsPercentage()`
+
+Determine if the discount is a percentage.
+
+```php
+public function discountIsPercentage(): bool
+```
+
+**Example:**
+
+```php
+if ($invoice->discountIsPercentage()) {
+    echo 'Percentage discount applied';
+}
+```
+
+### `percentOff()`
+
+Get the discount percentage for the invoice.
+
+```php
+public function percentOff(): int
+```
+
+**Example:**
+
+```php
+if ($invoice->discountIsPercentage()) {
+    echo $invoice->percentOff() . '% off';
+}
+```
+
+### `amountOff()`
+
+Get the discount amount for the invoice.
+
+```php
+public function amountOff(): string
+```
+
+**Example:**
+
+```php
+echo 'Save ' . $invoice->amountOff();
+```
+
+## Line Items
+
+### `invoiceItems()`
+
+Get the items applied to the invoice.
+
+```php
+public function invoiceItems(): array
+```
+
+**Example:**
+
+```php
+$items = $invoice->invoiceItems();
+
+foreach ($items as $item) {
+    echo $item['name'];
+    echo $item['amount'];
+}
+```
+
+## Status Methods
+
+### `status()`
+
+Get the status for this invoice instance.
+
+```php
+public function status(): string
+```
+
+**Example:**
+
+```php
+$status = $invoice->status();
+
+if ($status === 'paid') {
+    echo 'Invoice has been paid';
+}
+```
+
+## Invoice Operations
+
+### `update()`
+
+Update the invoice.
+
+```php
+public function update(array $data): mixed
+```
+
+**Parameters:**
+
+- `$data` (array): The data to update
+
+**Example:**
+
+```php
+$invoice->update([
+    'due_date' => now()->addDays(7)->format('Y-m-d'),
+    'description' => 'Updated invoice description',
+]);
+```
+
+### `verify()`
+
+Verify this invoice instance.
+
+```php
+public function verify(): mixed
+```
+
+**Example:**
+
+```php
+$verificationResult = $invoice->verify();
+```
+
+### `notify()`
+
+Notify the customer for this invoice instance.
+
+```php
+public function notify(): mixed
+```
+
+**Example:**
+
+```php
+$invoice->notify();
+```
+
+### `finalize()`
+
+Finalize this draft invoice instance.
+
+```php
+public function finalize(): mixed
+```
+
+**Example:**
+
+```php
+if ($invoice->status() === 'draft') {
+    $invoice->finalize();
+}
+```
+
+### `archive()`
+
+Archive this invoice instance.
+
+```php
+public function archive(): mixed
+```
+
+**Example:**
+
+```php
+$invoice->archive();
+```
+
+## View and PDF Methods
+
+### `view()`
+
+Get the View instance for the invoice.
+
+```php
+public function view(array $data): ViewContract
+```
+
+**Parameters:**
+
+- `$data` (array): Additional data to pass to the view
+
+**Example:**
+
+```php
+return $invoice->view([
+    'vendor' => 'Your Company',
+    'product' => 'Premium Subscription',
+]);
+```
+
+### `pdf()`
+
+Capture the invoice as a PDF and return the raw bytes.
+
+```php
+public function pdf(array $data): string
+```
+
+**Parameters:**
+
+- `$data` (array): Additional data to pass to the PDF view
+
+**Throws:** `Throwable`
+
+**Example:**
+
+```php
+$pdfContent = $invoice->pdf([
+    'vendor' => 'Your Company',
+    'product' => 'Premium Subscription',
+]);
+
+file_put_contents('invoice.pdf', $pdfContent);
+```
+
+### `download()`
+
+Create an invoice download response.
+
+```php
+public function download(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): Data including the product name
+
+**Throws:** `Throwable`
+
+**Example:**
+
+```php
+return $invoice->download([
+    'vendor' => 'Your Company',
+    'product' => 'Premium Subscription',
+]);
+```
+
+## Paystack Integration
+
+### `asPaystackInvoice()`
+
+Get the Paystack invoice instance.
+
+```php
+public function asPaystackInvoice(): array
+```
+
+**Example:**
+
+```php
+$paystackData = $invoice->asPaystackInvoice();
+echo $paystackData['request_code'];
+```
+
+## Magic Methods
+
+### `__get()`
+
+Dynamically get values from the Paystack invoice.
+
+```php
+public function __get(string $key): mixed
+```
+
+**Example:**
+
+```php
+echo $invoice->id;
+echo $invoice->request_code;
+echo $invoice->status;
+```

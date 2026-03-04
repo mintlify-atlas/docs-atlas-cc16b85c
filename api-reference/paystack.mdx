@@ -1,0 +1,538 @@
+---
+title: 'Paystack'
+description: 'API reference for the Paystack API wrapper class'
+---
+
+The `Paystack` class provides a wrapper for the Paystack API in Laravel Cashier Paystack.
+
+## Core API Method
+
+### `api()`
+
+Perform a Paystack API call.
+
+```php
+public static function api(string $uri, string $method, array $payload = []): Response
+```
+
+**Parameters:**
+
+- `$uri` (string): The API endpoint URI
+- `$method` (string): The HTTP method (get, post, put, delete)
+- `$payload` (array): The request payload
+
+**Throws:** 
+- `Exception` if API key is not set
+- `PaystackApiError` if the API request fails
+
+**Example:**
+
+```php
+$response = Paystack::api('/plan', 'get');
+$plans = $response->json('data');
+```
+
+## Transaction Methods
+
+### `charge()`
+
+Charge a customer.
+
+```php
+public static function charge(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The charge data
+
+**Example:**
+
+```php
+$response = Paystack::charge([
+    'email' => 'customer@email.com',
+    'amount' => 500000,
+]);
+```
+
+### `makePaymentRequest()`
+
+Initialize a transaction.
+
+```php
+public static function makePaymentRequest(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The transaction initialization data
+
+**Example:**
+
+```php
+$response = Paystack::makePaymentRequest([
+    'email' => 'customer@email.com',
+    'amount' => 1000000,
+]);
+
+$authorizationUrl = $response->json('data.authorization_url');
+```
+
+### `chargeAuthorization()`
+
+Charge an authorization.
+
+```php
+public static function chargeAuthorization(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The authorization charge data
+
+**Example:**
+
+```php
+$response = Paystack::chargeAuthorization([
+    'email' => 'customer@email.com',
+    'amount' => 500000,
+    'authorization_code' => 'AUTH_xxxxx',
+]);
+```
+
+### `refund()`
+
+Refund a transaction.
+
+```php
+public static function refund(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The refund data
+
+**Example:**
+
+```php
+$response = Paystack::refund([
+    'transaction' => 'TRX_xxxxx',
+    'amount' => 500000,
+]);
+```
+
+### `fetchTransactions()`
+
+Get all the transactions that have happened overtime.
+
+```php
+public function fetchTransactions(): Response
+```
+
+**Example:**
+
+```php
+$response = Paystack::fetchTransactions();
+$transactions = $response->json('data');
+```
+
+## Authorization Methods
+
+### `checkAuthorization()` (Deprecated)
+
+Check if an authorization has funds.
+
+```php
+public static function checkAuthorization(array $data): Response
+```
+
+**Deprecated:** As of March 2023. See [Paystack Changelog](https://paystack.com/docs/changelog/api/#march-2023)
+
+**Parameters:**
+
+- `$data` (array): The authorization check data
+
+**Example:**
+
+```php
+$response = Paystack::checkAuthorization([
+    'email' => 'customer@email.com',
+    'amount' => 500000,
+    'authorization_code' => 'AUTH_xxxxx',
+]);
+```
+
+### `deactivateAuthorization()`
+
+Deactivate an authorization.
+
+```php
+public static function deactivateAuthorization(string $code): Response
+```
+
+**Parameters:**
+
+- `$code` (string): The authorization code
+
+**Example:**
+
+```php
+$response = Paystack::deactivateAuthorization('AUTH_xxxxx');
+```
+
+## Subscription Methods
+
+### `createSubscription()`
+
+Create a subscription.
+
+```php
+public static function createSubscription(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The subscription data
+
+**Example:**
+
+```php
+$response = Paystack::createSubscription([
+    'customer' => 'CUS_xxxxx',
+    'plan' => 'PLN_xxxxx',
+    'start_date' => now()->addDays(7)->format('c'),
+]);
+
+$subscription = $response->json('data');
+```
+
+### `fetchSubscription()`
+
+Fetch a subscription.
+
+```php
+public static function fetchSubscription(string $code): Response
+```
+
+**Parameters:**
+
+- `$code` (string): The subscription code
+
+**Example:**
+
+```php
+$response = Paystack::fetchSubscription('SUB_xxxxx');
+$subscription = $response->json('data');
+```
+
+### `enableSubscription()`
+
+Enable a subscription using the subscription code and token.
+
+```php
+public static function enableSubscription(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The enable subscription data (token and code)
+
+**Example:**
+
+```php
+$response = Paystack::enableSubscription([
+    'token' => 'email_token',
+    'code' => 'SUB_xxxxx',
+]);
+```
+
+### `disableSubscription()`
+
+Disable a subscription.
+
+```php
+public static function disableSubscription(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The disable subscription data (token and code)
+
+**Example:**
+
+```php
+$response = Paystack::disableSubscription([
+    'token' => 'email_token',
+    'code' => 'SUB_xxxxx',
+]);
+```
+
+## Customer Methods
+
+### `createCustomer()`
+
+Create a customer.
+
+```php
+public static function createCustomer(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The customer data
+
+**Example:**
+
+```php
+$response = Paystack::createCustomer([
+    'email' => 'customer@email.com',
+    'first_name' => 'John',
+    'last_name' => 'Doe',
+]);
+
+$customer = $response->json('data');
+```
+
+### `fetchCustomer()`
+
+Fetch a customer based on ID or code.
+
+```php
+public static function fetchCustomer(string $customerId): Response
+```
+
+**Parameters:**
+
+- `$customerId` (string): The customer ID or code
+
+**Example:**
+
+```php
+$response = Paystack::fetchCustomer('CUS_xxxxx');
+$customer = $response->json('data');
+```
+
+### `customerSubscriptions()`
+
+Get customer subscriptions.
+
+```php
+public static function customerSubscriptions(string $customerId): Response
+```
+
+**Parameters:**
+
+- `$customerId` (string): The customer ID or code
+
+**Example:**
+
+```php
+$response = Paystack::customerSubscriptions('CUS_xxxxx');
+$subscriptions = $response->json('data');
+```
+
+## Invoice (Payment Request) Methods
+
+### `createInvoice()`
+
+Create an invoice (payment request).
+
+```php
+public static function createInvoice(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The invoice data
+
+**Example:**
+
+```php
+$response = Paystack::createInvoice([
+    'customer' => 'CUS_xxxxx',
+    'amount' => 500000,
+    'description' => 'Invoice for services',
+    'due_date' => now()->addDays(7)->format('Y-m-d'),
+]);
+```
+
+### `fetchInvoices()`
+
+Fetch invoices.
+
+```php
+public static function fetchInvoices(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): Query parameters
+
+**Example:**
+
+```php
+$response = Paystack::fetchInvoices([
+    'customer' => 'CUS_xxxxx',
+]);
+
+$invoices = $response->json('data');
+```
+
+### `findInvoice()`
+
+Find a specific invoice.
+
+```php
+public static function findInvoice(string $invoiceId): Response
+```
+
+**Parameters:**
+
+- `$invoiceId` (string): The invoice ID
+
+**Example:**
+
+```php
+$response = Paystack::findInvoice('INV_xxxxx');
+$invoice = $response->json('data');
+```
+
+### `updateInvoice()`
+
+Update an invoice.
+
+```php
+public static function updateInvoice(string $invoiceId, array $data): Response
+```
+
+**Parameters:**
+
+- `$invoiceId` (string): The invoice ID
+- `$data` (array): The update data
+
+**Example:**
+
+```php
+$response = Paystack::updateInvoice('INV_xxxxx', [
+    'description' => 'Updated description',
+    'due_date' => now()->addDays(14)->format('Y-m-d'),
+]);
+```
+
+### `verifyInvoice()`
+
+Verify an invoice.
+
+```php
+public static function verifyInvoice(string $invoiceCode): Response
+```
+
+**Parameters:**
+
+- `$invoiceCode` (string): The invoice request code
+
+**Example:**
+
+```php
+$response = Paystack::verifyInvoice('PRQ_xxxxx');
+```
+
+### `notifyInvoice()`
+
+Notify customer about an invoice.
+
+```php
+public static function notifyInvoice(string $invoiceId): Response
+```
+
+**Parameters:**
+
+- `$invoiceId` (string): The invoice ID
+
+**Example:**
+
+```php
+$response = Paystack::notifyInvoice('INV_xxxxx');
+```
+
+### `finalizeInvoice()`
+
+Finalize a draft invoice.
+
+```php
+public static function finalizeInvoice(string $invoiceId): Response
+```
+
+**Parameters:**
+
+- `$invoiceId` (string): The invoice ID
+
+**Example:**
+
+```php
+$response = Paystack::finalizeInvoice('INV_xxxxx');
+```
+
+### `archiveInvoice()`
+
+Archive an invoice.
+
+```php
+public static function archiveInvoice(string $invoiceId): Response
+```
+
+**Parameters:**
+
+- `$invoiceId` (string): The invoice ID
+
+**Example:**
+
+```php
+$response = Paystack::archiveInvoice('INV_xxxxx');
+```
+
+## Plan Methods
+
+### `createPlan()`
+
+Create a plan.
+
+```php
+public static function createPlan(array $data): Response
+```
+
+**Parameters:**
+
+- `$data` (array): The plan data
+
+**Example:**
+
+```php
+$response = Paystack::createPlan([
+    'name' => 'Premium Plan',
+    'amount' => 500000,
+    'interval' => 'monthly',
+]);
+
+$plan = $response->json('data');
+```
+
+### `fetchPlans()`
+
+Get all the plans that you have on Paystack.
+
+```php
+public static function fetchPlans(): Response
+```
+
+**Example:**
+
+```php
+$response = Paystack::fetchPlans();
+$plans = $response->json('data');
+
+foreach ($plans as $plan) {
+    echo $plan['name'];
+    echo $plan['amount'];
+}
+```

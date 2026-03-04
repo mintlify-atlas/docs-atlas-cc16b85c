@@ -1,0 +1,186 @@
+---
+title: 'Card'
+description: 'API reference for the Card class'
+---
+
+The `Card` class provides methods for working with Paystack payment authorizations (cards) in Laravel Cashier Paystack.
+
+## Constructor
+
+### `__construct()`
+
+Create a new card instance.
+
+```php
+public function __construct($billable, $card)
+```
+
+**Parameters:**
+
+- `$billable` (Model): The billable model instance
+- `$card` (array): The Paystack card/authorization data
+
+**Example:**
+
+```php
+$card = new Card($user, $authorizationData);
+```
+
+## Methods
+
+### `check()`
+
+Check if the payment method has funds for the payment you seek.
+
+```php
+public function check($amount): mixed
+```
+
+**Parameters:**
+
+- `$amount` (int): The amount to check (in kobo)
+
+**Throws:** `Exception` if the payment method is no longer reusable
+
+**Example:**
+
+```php
+try {
+    $result = $card->check(500000); // Check for ₦5,000
+    
+    if ($result['status']) {
+        echo 'Card has sufficient funds';
+    }
+} catch (Exception $e) {
+    echo 'Payment method is no longer reusable';
+}
+```
+
+### `delete()`
+
+Delete (deactivate) the payment method.
+
+```php
+public function delete(): mixed
+```
+
+**Example:**
+
+```php
+$card->delete();
+```
+
+### `asPaystackAuthorization()`
+
+Get the Paystack payment authorization object.
+
+```php
+public function asPaystackAuthorization(): object
+```
+
+**Example:**
+
+```php
+$authorization = $card->asPaystackAuthorization();
+echo $authorization->authorization_code;
+echo $authorization->card_type;
+```
+
+## Magic Methods
+
+### `__get()`
+
+Dynamically get values from the Paystack card.
+
+```php
+public function __get(string $key): mixed
+```
+
+**Example:**
+
+```php
+echo $card->authorization_code;
+echo $card->card_type; // visa, mastercard, etc.
+echo $card->last4; // Last 4 digits
+echo $card->exp_month;
+echo $card->exp_year;
+echo $card->bin; // First 6 digits
+echo $card->bank;
+echo $card->channel;
+echo $card->signature;
+echo $card->reusable;
+echo $card->country_code;
+echo $card->account_name;
+```
+
+## Common Card Properties
+
+The following properties are typically available via the magic `__get()` method:
+
+- **`authorization_code`**: The authorization code for charging the card
+- **`card_type`**: The card brand (visa, mastercard, verve, etc.)
+- **`last4`**: Last 4 digits of the card
+- **`exp_month`**: Expiration month (e.g., "12")
+- **`exp_year`**: Expiration year (e.g., "2025")
+- **`bin`**: Bank Identification Number (first 6 digits)
+- **`bank`**: The issuing bank name
+- **`channel`**: Payment channel (e.g., "card")
+- **`signature`**: Card signature
+- **`reusable`**: Whether the card can be charged again
+- **`country_code`**: Country code (e.g., "NG")
+- **`account_name`**: Account holder name
+
+## Usage Examples
+
+### Getting All Customer Cards
+
+```php
+$cards = $user->paymentMethods();
+
+foreach ($cards as $card) {
+    echo $card->card_type . ' ending in ' . $card->last4;
+    echo 'Expires: ' . $card->exp_month . '/' . $card->exp_year;
+}
+```
+
+### Checking Card Validity
+
+```php
+$card = $user->defaultPaymentMethod();
+
+if ($card->reusable) {
+    try {
+        $card->check(1000000); // Check for ₦10,000
+        echo 'Card is valid and has funds';
+    } catch (Exception $e) {
+        echo 'Card check failed: ' . $e->getMessage();
+    }
+} else {
+    echo 'Card is not reusable';
+}
+```
+
+### Deleting a Card
+
+```php
+$card = $user->findPaymentMethod($authorizationCode);
+
+if ($card) {
+    $card->delete();
+    echo 'Payment method removed';
+}
+```
+
+### Displaying Card Information
+
+```php
+$card = $user->defaultPaymentMethod();
+
+if ($card) {
+    echo "Card Type: {$card->card_type}";
+    echo "Last 4: {$card->last4}";
+    echo "Expires: {$card->exp_month}/{$card->exp_year}";
+    echo "Bank: {$card->bank}";
+    echo "Reusable: " . ($card->reusable ? 'Yes' : 'No');
+}
+```

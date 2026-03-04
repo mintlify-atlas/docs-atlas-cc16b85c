@@ -1,0 +1,204 @@
+---
+title: 'ManagesCards'
+description: 'Methods for managing customer payment cards'
+---
+
+## Overview
+
+The `ManagesCards` trait provides methods for retrieving and managing customer payment cards (authorization codes). This trait is included in the `Billable` trait.
+
+## Methods
+
+### cards()
+
+Get a collection of the entity's payment methods.
+
+```php
+public function cards(array $parameters = []): Collection
+```
+
+<ParamField path="parameters" type="array" default="[]">
+  Additional parameters (currently not used in implementation)
+</ParamField>
+
+**Returns:** `Illuminate\Support\Collection`
+
+Returns a collection of card authorization objects from Paystack. Each card object contains:
+
+- `authorization_code` - The authorization code for charging the card
+- `bin` - First 6 digits of the card
+- `last4` - Last 4 digits of the card
+- `exp_month` - Card expiration month
+- `exp_year` - Card expiration year
+- `card_type` - Type of card (e.g., 'visa', 'mastercard')
+- `bank` - Issuing bank name
+- `channel` - Payment channel ('card')
+- `reusable` - Whether the authorization can be reused
+- `signature` - Unique signature for this authorization
+- `brand` - Card brand
+
+**Example:**
+
+```php
+$cards = $user->cards();
+
+foreach ($cards as $card) {
+    echo $card['card_type'] . ' ending in ' . $card['last4'];
+    echo ' (expires: ' . $card['exp_month'] . '/' . $card['exp_year'] . ')';
+}
+```
+
+---
+
+### deleteCards()
+
+Deletes the entity's payment methods.
+
+```php
+public function deleteCards(): void
+```
+
+**Returns:** `void`
+
+Iterates through all cards and deletes each one. This removes the saved payment methods from the customer's account.
+
+**Example:**
+
+```php
+// Delete all saved cards for a user
+$user->deleteCards();
+```
+
+## Usage Examples
+
+### Displaying Saved Cards
+
+```php
+use App\Models\User;
+
+$user = auth()->user();
+$cards = $user->cards();
+
+return view('payment-methods', compact('cards'));
+```
+
+**Blade Template:**
+
+```blade
+@foreach($cards as $card)
+    <div class="card-item">
+        <img src="/img/cards/{{ $card['card_type'] }}.png" alt="{{ $card['card_type'] }}">
+        <span>{{ ucfirst($card['card_type']) }} •••• {{ $card['last4'] }}</span>
+        <span>Expires: {{ $card['exp_month'] }}/{{ $card['exp_year'] }}</span>
+        <span>{{ $card['bank'] }}</span>
+    </div>
+@endforeach
+```
+
+### Charging a Saved Card
+
+```php
+$user = auth()->user();
+$cards = $user->cards();
+
+if ($cards->isNotEmpty()) {
+    $firstCard = $cards->first();
+    
+    // Charge using the authorization code
+    $user->charge(5000, [
+        'authorization_code' => $firstCard['authorization_code']
+    ]);
+}
+```
+
+### Card Selection Form
+
+```php
+class PaymentController extends Controller
+{
+    public function showPaymentMethods()
+    {
+        $user = auth()->user();
+        $cards = $user->cards();
+        
+        return view('payment.methods', compact('cards'));
+    }
+    
+    public function charge(Request $request)
+    {
+        $request->validate([
+            'authorization_code' => 'required|string',
+            'amount' => 'required|integer|min:100'
+        ]);
+        
+        try {
+            $response = auth()->user()->charge($request->amount, [
+                'authorization_code' => $request->authorization_code
+            ]);
+            
+            return back()->with('success', 'Payment successful!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Payment failed: ' . $e->getMessage());
+        }
+    }
+    
+    public function deleteAllCards()
+    {
+        auth()->user()->deleteCards();
+        
+        return back()->with('success', 'All payment methods removed.');
+    }
+}
+```
+
+### Checking for Saved Cards
+
+```php
+$user = auth()->user();
+
+if ($user->cards()->isEmpty()) {
+    // No saved cards, redirect to add payment method
+    return redirect()->route('payment.add');
+}
+
+// User has saved cards
+$defaultCard = $user->cards()->first();
+```
+
+### Getting Specific Card Information
+
+```php
+$user = auth()->user();
+$cards = $user->cards();
+
+// Get all Visa cards
+$visaCards = $cards->filter(function ($card) {
+    return $card['card_type'] === 'visa';
+});
+
+// Get reusable cards only
+$reusableCards = $cards->filter(function ($card) {
+    return $card['reusable'] === true;
+});
+
+// Find card by last 4 digits
+$card = $cards->first(function ($card) {
+    return $card['last4'] === '4081';
+});
+```
+
+## Important Notes
+
+1. **Card Storage**: Cards are not stored in your database. They are retrieved from Paystack's customer record each time you call `cards()`.
+
+2. **Authorization Codes**: The `authorization_code` is what you use to charge saved cards. Store this securely if you need to reference specific cards.
+
+3. **Channel Filter**: The `cards()` method automatically filters for card-type authorizations only, excluding other payment channels like bank transfers.
+
+4. **Deletion**: When calling `deleteCards()`, each card is deleted individually through the Card model's delete method.
+
+5. **Customer Required**: These methods require the billable to have been created as a Paystack customer first using `createAsCustomer()`.
+
+## Source Location
+
+`src/Concerns/ManagesCards.php:1-43`

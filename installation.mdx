@@ -1,0 +1,141 @@
+---
+title: Installation
+description: Step-by-step guide to install Laravel Cashier Paystack in your Laravel application using Composer.
+---
+
+## Installing the Package
+
+Laravel Cashier Paystack can be easily installed via Composer. Follow these steps to add it to your Laravel project.
+
+<Steps>
+
+<Step title="Install via Composer">
+
+Run the following command in your project directory to add the package to your dependencies:
+
+```bash
+composer require veekthoven/laravel-cashier-paystack
+```
+
+Composer will automatically download the package and its dependencies.
+
+<Note>
+The package uses Laravel's auto-discovery feature, so the service provider will be registered automatically.
+</Note>
+
+</Step>
+
+<Step title="Verify Installation">
+
+After installation, you can verify that the package was installed correctly by checking your `composer.json` file:
+
+```json
+"require": {
+    "veekthoven/laravel-cashier-paystack": "^1.0"
+}
+```
+
+You can also run `composer show` to see all installed packages:
+
+```bash
+composer show veekthoven/laravel-cashier-paystack
+```
+
+</Step>
+
+</Steps>
+
+## Package Dependencies
+
+Laravel Cashier Paystack automatically installs the following dependencies:
+
+| Package | Version | Purpose |
+|---------|---------|----------|
+| `dompdf/dompdf` | ^2.0 | PDF invoice generation |
+| `guzzlehttp/guzzle` | ^7.8 | HTTP client for Paystack API |
+| `nesbot/carbon` | ^2.0\|^3.0 | Date and time manipulation |
+
+## System Requirements
+
+Before installing, ensure your system meets these requirements:
+
+<CardGroup cols={2}>
+  <Card title="PHP Version" icon="php">
+    PHP 8.1 or higher is required
+  </Card>
+  <Card title="Laravel Version" icon="laravel">
+    Laravel 10.x, 11.x, or 12.x
+  </Card>
+</CardGroup>
+
+### Required PHP Extensions
+
+The following PHP extensions must be enabled:
+
+- `json` - For handling JSON data
+- `mbstring` - For string manipulation
+- `openssl` - For secure connections to Paystack
+- `pdo` - For database operations
+
+<Warning>
+If you're missing any required PHP extensions, install them before proceeding. On Ubuntu/Debian, you can install them using:
+
+```bash
+sudo apt-get install php8.1-json php8.1-mbstring php8.1-openssl php8.1-pdo
+```
+</Warning>
+
+## Compatibility Matrix
+
+Laravel Cashier Paystack supports multiple versions of Laravel and its dependencies:
+
+| Dependency | Supported Versions |
+|------------|--------------------|
+| PHP | ^8.1 |
+| Laravel Framework | ^10.0, ^11.0, ^12.0 |
+| Symfony HTTP Kernel | ^6.0, ^7.0 |
+| Guzzle HTTP | ^7.8 |
+| Carbon | ^2.0, ^3.0 |
+
+## Troubleshooting Installation
+
+### Composer Memory Limit
+
+If you encounter memory limit errors during installation, increase Composer's memory limit:
+
+```bash
+php -d memory_limit=-1 /usr/local/bin/composer require veekthoven/laravel-cashier-paystack
+```
+
+### Version Conflicts
+
+If you experience dependency conflicts, try updating your existing packages first:
+
+```bash
+composer update
+composer require veekthoven/laravel-cashier-paystack
+```
+
+### Minimum Stability
+
+The package requires a minimum stability of `dev` with `prefer-stable` enabled. If you have strict stability settings in your `composer.json`, you may need to adjust them:
+
+```json
+{
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
+```
+
+## Next Steps
+
+Now that the package is installed, proceed to the [Configuration](/configuration) guide to:
+
+1. Publish the configuration file
+2. Set up your Paystack API keys
+3. Run the required database migrations
+4. Configure the Billable model
+
+<Note>
+Do not skip the configuration step! The package requires proper configuration to communicate with Paystack's API.
+</Note>

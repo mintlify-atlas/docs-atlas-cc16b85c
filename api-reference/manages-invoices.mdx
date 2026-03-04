@@ -1,0 +1,364 @@
+---
+title: 'ManagesInvoices'
+description: 'Methods for creating and managing invoices'
+---
+
+## Overview
+
+The `ManagesInvoices` trait provides methods for creating, retrieving, and managing customer invoices. This trait is included in the `Billable` trait.
+
+## Methods
+
+### tab()
+
+Invoice the customer for the given amount.
+
+```php
+public function tab(string $description, int $amount, array $options = []): array
+```
+
+<ParamField path="description" type="string" required>
+  Description of the invoice
+</ParamField>
+
+<ParamField path="amount" type="int" required>
+  Amount to invoice in the smallest currency unit
+</ParamField>
+
+<ParamField path="options" type="array" required>
+  Invoice options (must include `due_date`)
+</ParamField>
+
+**Options:**
+
+<ParamField path="options.due_date" type="string" required>
+  The invoice due date (any format parseable by Carbon)
+</ParamField>
+
+<ParamField path="options.currency" type="string">
+  Currency code (defaults to `preferredCurrency()`)
+</ParamField>
+
+**Returns:** `array`
+
+Returns the Paystack API response for the created invoice.
+
+**Throws:** 
+- `InvalidArgumentException` if the customer is not a Paystack customer
+- `InvalidArgumentException` if no due date is provided
+
+**Example:**
+
+```php
+$user->tab('Consulting services', 50000, [
+    'due_date' => '2024-12-31'
+]);
+```
+
+---
+
+### invoiceFor()
+
+Invoice the billable entity outside of regular billing cycle.
+
+```php
+public function invoiceFor(string $description, int $amount, array $options = []): array
+```
+
+<ParamField path="description" type="string" required>
+  Description of the invoice
+</ParamField>
+
+<ParamField path="amount" type="int" required>
+  Amount to invoice in the smallest currency unit
+</ParamField>
+
+<ParamField path="options" type="array" required>
+  Invoice options (must include `due_date`)
+</ParamField>
+
+**Returns:** `array`
+
+Alias for the `tab()` method. Returns the Paystack API response for the created invoice.
+
+**Example:**
+
+```php
+$user->invoiceFor('One-time service', 25000, [
+    'due_date' => now()->addDays(7)
+]);
+```
+
+---
+
+### findInvoice()
+
+Find an invoice by ID.
+
+```php
+public function findInvoice(string $id): ?Invoice
+```
+
+<ParamField path="id" type="string" required>
+  The invoice ID or code
+</ParamField>
+
+**Returns:** `veekthoven\Cashier\Invoice|null`
+
+Returns an `Invoice` instance if found and belongs to the customer, or `null` otherwise.
+
+**Example:**
+
+```php
+$invoice = $user->findInvoice('INV_xxxxx');
+
+if ($invoice) {
+    echo $invoice->total();
+}
+```
+
+---
+
+### findInvoiceOrFail()
+
+Find an invoice or throw a 404 error.
+
+```php
+public function findInvoiceOrFail(string $id): Invoice
+```
+
+<ParamField path="id" type="string" required>
+  The invoice ID or code
+</ParamField>
+
+**Returns:** `veekthoven\Cashier\Invoice`
+
+Returns an `Invoice` instance.
+
+**Throws:** `Symfony\Component\HttpKernel\Exception\NotFoundHttpException` if invoice is not found
+
+**Example:**
+
+```php
+Route::get('/invoices/{id}', function ($id) {
+    $invoice = auth()->user()->findInvoiceOrFail($id);
+    return view('invoice', compact('invoice'));
+});
+```
+
+---
+
+### downloadInvoice()
+
+Create an invoice download response.
+
+```php
+public function downloadInvoice(string $id, array $data): Response
+```
+
+<ParamField path="id" type="string" required>
+  The invoice ID or code
+</ParamField>
+
+<ParamField path="data" type="array" required>
+  Data to pass to the invoice download view
+</ParamField>
+
+**Returns:** `Symfony\Component\HttpFoundation\Response`
+
+Returns a download response for the invoice PDF.
+
+**Throws:** `NotFoundHttpException` if invoice is not found
+
+**Example:**
+
+```php
+Route::get('/invoices/{id}/download', function ($id) {
+    return auth()->user()->downloadInvoice($id, [
+        'vendor' => 'Your Company',
+        'product' => 'Your Product'
+    ]);
+});
+```
+
+---
+
+### invoices()
+
+Get a collection of the entity's invoices.
+
+```php
+public function invoices(array $options = []): Collection
+```
+
+<ParamField path="options" type="array" default="[]">
+  Options to filter invoices
+</ParamField>
+
+**Options:**
+
+<ParamField path="options.status" type="string">
+  Filter by status (e.g., 'pending', 'paid')
+</ParamField>
+
+<ParamField path="options.paid" type="bool">
+  Filter by paid status
+</ParamField>
+
+<ParamField path="options.from" type="string">
+  Start date for filtering
+</ParamField>
+
+<ParamField path="options.to" type="string">
+  End date for filtering
+</ParamField>
+
+**Returns:** `Illuminate\Support\Collection`
+
+Returns a collection of invoice arrays from Paystack.
+
+**Throws:** `InvalidCustomer` if the customer doesn't exist
+
+**Example:**
+
+```php
+// Get all invoices
+$allInvoices = $user->invoices();
+
+// Get invoices with filters
+$paidInvoices = $user->invoices(['paid' => true]);
+```
+
+---
+
+### invoicesOnlyPending()
+
+Get an array of the entity's pending invoices.
+
+```php
+public function invoicesOnlyPending(array $parameters = []): Collection
+```
+
+<ParamField path="parameters" type="array" default="[]">
+  Additional parameters to pass to the invoices query
+</ParamField>
+
+**Returns:** `Illuminate\Support\Collection`
+
+Returns a collection of pending invoices.
+
+**Example:**
+
+```php
+$pendingInvoices = $user->invoicesOnlyPending();
+```
+
+---
+
+### invoicesOnlyPaid()
+
+Get an array of the entity's paid invoices.
+
+```php
+public function invoicesOnlyPaid(array $parameters = []): Collection
+```
+
+<ParamField path="parameters" type="array" default="[]">
+  Additional parameters to pass to the invoices query
+</ParamField>
+
+**Returns:** `Illuminate\Support\Collection`
+
+Returns a collection of paid invoices.
+
+**Example:**
+
+```php
+$paidInvoices = $user->invoicesOnlyPaid();
+```
+
+## Usage Examples
+
+### Creating an Invoice
+
+```php
+use App\Models\User;
+
+$user = User::find(1);
+
+$invoice = $user->tab('Premium support package', 100000, [
+    'due_date' => now()->addDays(30),
+    'currency' => 'NGN'
+]);
+
+if ($invoice['status']) {
+    $invoiceCode = $invoice['data']['code'];
+}
+```
+
+### Listing Customer Invoices
+
+```php
+$user = auth()->user();
+
+// Get all pending invoices
+$pending = $user->invoicesOnlyPending();
+
+// Get all paid invoices
+$paid = $user->invoicesOnlyPaid();
+
+// Get invoices from a specific period
+$recentInvoices = $user->invoices([
+    'from' => now()->subMonths(3),
+    'to' => now()
+]);
+```
+
+### Downloading an Invoice
+
+```php
+Route::get('/invoices/{invoice}/download', function ($invoice) {
+    return auth()->user()->downloadInvoice($invoice, [
+        'vendor' => 'Acme Corp',
+        'product' => 'Premium Subscription',
+        'street' => '123 Business Street',
+        'location' => 'Lagos, Nigeria',
+    ]);
+});
+```
+
+### Invoice Management in Controller
+
+```php
+class InvoiceController extends Controller
+{
+    public function index()
+    {
+        $user = auth()->user();
+        
+        return view('invoices.index', [
+            'pending' => $user->invoicesOnlyPending(),
+            'paid' => $user->invoicesOnlyPaid()
+        ]);
+    }
+    
+    public function show($id)
+    {
+        $invoice = auth()->user()->findInvoiceOrFail($id);
+        
+        return view('invoices.show', compact('invoice'));
+    }
+    
+    public function download($id)
+    {
+        return auth()->user()->downloadInvoice($id, [
+            'vendor' => config('app.name'),
+            'product' => 'Subscription Service'
+        ]);
+    }
+}
+```
+
+## Source Location
+
+`src/Concerns/ManagesInvoices.php:1-156`

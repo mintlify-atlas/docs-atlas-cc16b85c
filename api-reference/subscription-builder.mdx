@@ -1,0 +1,241 @@
+---
+title: 'SubscriptionBuilder'
+description: 'API reference for the SubscriptionBuilder class'
+---
+
+The `SubscriptionBuilder` class provides a fluent interface for creating new subscriptions in Laravel Cashier Paystack.
+
+## Constructor
+
+### `__construct()`
+
+Create a new subscription builder instance.
+
+```php
+public function __construct($billable, string $type, string $plan)
+```
+
+**Parameters:**
+
+- `$billable` (Billable): The model that is subscribing
+- `$type` (string): The type of subscription
+- `$plan` (string): The Paystack plan code
+
+**Example:**
+
+```php
+$builder = new SubscriptionBuilder($user, 'default', 'PLN_basic');
+```
+
+## Trial Methods
+
+### `trialDays()`
+
+Specify the number of trial days to apply to the subscription.
+
+```php
+public function trialDays(int $trialDays): self
+```
+
+**Parameters:**
+
+- `$trialDays` (int): The number of trial days
+
+**Example:**
+
+```php
+$user->newSubscription('default', 'PLN_basic')
+    ->trialDays(14)
+    ->create();
+```
+
+### `skipTrial()`
+
+Force the trial to end immediately.
+
+```php
+public function skipTrial(): self
+```
+
+**Example:**
+
+```php
+$user->newSubscription('default', 'PLN_basic')
+    ->skipTrial()
+    ->create();
+```
+
+## Creation Methods
+
+### `create()`
+
+Create a new Paystack subscription.
+
+```php
+public function create($token = null, array $options = []): Subscription
+```
+
+**Parameters:**
+
+- `$token` (string|null): The authorization token to use. If not provided, the customer's most recent authorization will be used
+- `$options` (array): Additional options to pass to Paystack
+
+**Throws:** `Exception` if Paystack fails to create the subscription
+
+**Example:**
+
+```php
+$subscription = $user->newSubscription('default', 'PLN_basic')
+    ->create();
+
+// With specific authorization
+$subscription = $user->newSubscription('default', 'PLN_basic')
+    ->create('AUTH_xxxxx');
+
+// With additional options
+$subscription = $user->newSubscription('default', 'PLN_basic')
+    ->create(null, [
+        'invoice_limit' => 0,
+    ]);
+```
+
+### `charge()`
+
+Charge for a Paystack subscription.
+
+```php
+public function charge(array $options = []): Subscription
+```
+
+**Parameters:**
+
+- `$options` (array): Additional options for the charge
+
+**Throws:** `Exception` if the charge fails
+
+**Example:**
+
+```php
+$subscription = $user->newSubscription('default', 'PLN_basic')
+    ->charge([
+        'metadata' => json_encode([
+            'custom_field' => 'value',
+        ]),
+    ]);
+```
+
+### `save()`
+
+Add a new Paystack subscription to the model.
+
+```php
+public function save(array $options = []): Subscription
+```
+
+**Parameters:**
+
+- `$options` (array): The subscription data from Paystack
+
+**Throws:** `Exception` if save fails
+
+**Example:**
+
+```php
+// This is typically called internally by create()
+$subscription = $builder->save($paystackSubscriptionData);
+```
+
+## Usage Examples
+
+### Basic Subscription Creation
+
+```php
+use veekthoven\Cashier\SubscriptionBuilder;
+
+$subscription = $user->newSubscription('default', 'PLN_basic')
+    ->create();
+```
+
+### Subscription with Trial Period
+
+```php
+$subscription = $user->newSubscription('default', 'PLN_premium')
+    ->trialDays(30)
+    ->create();
+
+if ($subscription->onTrial()) {
+    echo 'Trial ends at: ' . $subscription->trial_ends_at;
+}
+```
+
+### Subscription without Trial
+
+```php
+$subscription = $user->newSubscription('default', 'PLN_basic')
+    ->skipTrial()
+    ->create();
+```
+
+### Subscription with Specific Payment Method
+
+```php
+$authorizationCode = 'AUTH_xxxxx';
+
+$subscription = $user->newSubscription('default', 'PLN_basic')
+    ->create($authorizationCode);
+```
+
+### Multiple Subscription Types
+
+```php
+// Main subscription
+$mainSubscription = $user->newSubscription('main', 'PLN_basic')
+    ->create();
+
+// Add-on subscription
+$addonSubscription = $user->newSubscription('addon', 'PLN_extra_features')
+    ->skipTrial()
+    ->create();
+```
+
+### Subscription with Custom Metadata
+
+```php
+$subscription = $user->newSubscription('default', 'PLN_basic')
+    ->charge([
+        'metadata' => json_encode([
+            'team_id' => $team->id,
+            'plan_name' => 'Basic Plan',
+            'source' => 'web',
+        ]),
+    ]);
+```
+
+### Subscription with Delayed Start Date
+
+```php
+use Carbon\Carbon;
+
+$startDate = Carbon::now()->addDays(7);
+
+$subscription = $user->newSubscription('default', 'PLN_basic')
+    ->create(null, [
+        'start_date' => $startDate->format('c'),
+    ]);
+```
+
+## Fluent Interface Example
+
+```php
+$subscription = $user
+    ->newSubscription('premium', 'PLN_premium')
+    ->trialDays(14)
+    ->create();
+
+if ($subscription->valid()) {
+    echo 'Subscription created successfully!';
+    echo 'Type: ' . $subscription->type;
+    echo 'Plan: ' . $subscription->paystack_plan;
+    echo 'Trial ends: ' . $subscription->trial_ends_at;
+}
+```

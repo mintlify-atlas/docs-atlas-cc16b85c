@@ -1,0 +1,86 @@
+---
+title: Introduction
+description: Learn about Laravel Cashier Paystack, a package that provides an expressive, fluent interface to Paystack's subscription billing services.
+---
+
+## Overview
+
+Laravel Cashier Paystack provides an expressive, fluent interface to [Paystack's](https://paystack.com) subscription billing services. It handles almost all of the boilerplate subscription billing code you are dreading writing.
+
+This package is a Laravel Cashier wrapper specifically designed to work with Paystack, the leading payment gateway in Africa. It brings the same elegant API design philosophy of Laravel Cashier to the Paystack payment platform.
+
+## Key Features
+
+Laravel Cashier Paystack comes with a comprehensive set of features to handle subscription billing:
+
+### Subscription Management
+- Create and manage recurring subscriptions
+- Support for multiple subscription types per user
+- Trial periods with or without upfront billing
+- Subscription cancellation with grace periods
+- Subscription resumption for completed lifecycles
+- Check subscription status and trial periods
+
+### Payment Processing
+- One-time charges against customer cards
+- Invoice generation with PDF downloads
+- Support for card authorization tokens
+- Charge refunds
+- Custom metadata for charges
+
+### Customer Management
+- Create Paystack customers directly from your User model
+- Store and manage payment methods (cards)
+- Retrieve customer authorizations
+- Delete payment methods
+
+### Webhook Handling
+- Built-in webhook controller for Paystack events
+- Automatic handling of subscription lifecycle events
+- Extensible webhook handlers for custom events
+- Webhook signature verification for security
+
+## Why Use Laravel Cashier Paystack?
+
+<Note>
+If you're building a Laravel application that needs subscription billing with Paystack, this package saves you weeks of development time.
+</Note>
+
+**Native Paystack Integration**: Unlike other billing solutions, this package is built specifically for Paystack's API, ensuring full compatibility with all Paystack features.
+
+**Laravel-Native**: Follows Laravel's conventions and design patterns, making it feel like a natural extension of your Laravel application.
+
+**Production-Ready**: Handles edge cases, webhook security, and subscription lifecycle management out of the box.
+
+**Flexible Currency Support**: Works with NGN (Nigerian Naira), GHS (Ghanaian Cedi), and other currencies supported by Paystack.
+
+**Time-Saving**: Eliminates the need to write boilerplate code for subscriptions, invoices, webhooks, and payment processing.
+
+## Common Use Cases
+
+Laravel Cashier Paystack is perfect for:
+
+- **SaaS Applications**: Manage monthly or yearly subscriptions for your software service
+- **Membership Sites**: Handle recurring membership fees with trial periods
+- **Content Platforms**: Monetize premium content with subscription tiers
+- **E-learning Platforms**: Charge for course access with flexible billing
+- **Any Recurring Billing**: Process regular payments for services or products
+
+## Requirements
+
+Before installing Laravel Cashier Paystack, ensure your environment meets these requirements:
+
+- PHP 8.1 or higher
+- Laravel 10.0, 11.0, or 12.0
+- A Paystack account with API keys
+- Composer for package management
+
+<Warning>
+Make sure you have a Paystack account set up and your API keys ready before proceeding with installation.
+</Warning>
+
+## Next Steps
+
+Ready to get started? Head over to the [Installation](/installation) guide to add Laravel Cashier Paystack to your project.
+
+Once installed, check out the [Configuration](/configuration) guide to set up your Paystack credentials and prepare your database.

@@ -1,0 +1,347 @@
+---
+title: 'ManagesSubscriptions'
+description: 'Methods for managing customer subscriptions'
+---
+
+## Overview
+
+The `ManagesSubscriptions` trait provides methods for creating and managing customer subscriptions. This trait is included in the `Billable` trait.
+
+## Methods
+
+### subscriptions()
+
+Get all of the subscriptions for the billable model.
+
+```php
+public function subscriptions(): MorphMany
+```
+
+**Returns:** `Illuminate\Database\Eloquent\Relations\MorphMany`
+
+Returns a polymorphic relationship to all subscriptions ordered by creation date (newest first).
+
+**Example:**
+```php
+$subscriptions = $user->subscriptions()->get();
+```
+
+---
+
+### subscription()
+
+Get a subscription instance by type.
+
+```php
+public function subscription(string $type = 'default'): ?Subscription
+```
+
+<ParamField path="type" type="string" default="default">
+  The subscription type to retrieve
+</ParamField>
+
+**Returns:** `veekthoven\Cashier\Subscription|null`
+
+Returns the first subscription matching the given type, or `null` if not found.
+
+**Example:**
+```php
+$subscription = $user->subscription('default');
+$premiumSubscription = $user->subscription('premium');
+```
+
+---
+
+### newSubscription()
+
+Begin creating a new subscription.
+
+```php
+public function newSubscription(string $subscription, string $plan): SubscriptionBuilder
+```
+
+<ParamField path="subscription" type="string" required>
+  The name/type of the subscription
+</ParamField>
+
+<ParamField path="plan" type="string" required>
+  The Paystack plan code (e.g., 'PLN_xxxxxxxxx')
+</ParamField>
+
+**Returns:** `veekthoven\Cashier\SubscriptionBuilder`
+
+Returns a subscription builder instance that allows you to configure the subscription before creating it.
+
+**Example:**
+```php
+$user->newSubscription('default', 'PLN_xxxxxxxxx')
+    ->trialDays(14)
+    ->create();
+```
+
+---
+
+### subscribed()
+
+Determine if the billable has a valid subscription.
+
+```php
+public function subscribed(string $subscription = 'default', string $plan = null): bool
+```
+
+<ParamField path="subscription" type="string" default="default">
+  The subscription type to check
+</ParamField>
+
+<ParamField path="plan" type="string|null" default="null">
+  Optional plan code to verify the subscription is on a specific plan
+</ParamField>
+
+**Returns:** `bool`
+
+Returns `true` if the billable has an active, valid subscription. If a plan is specified, also checks if the subscription is for that specific plan.
+
+**Example:**
+```php
+if ($user->subscribed('default')) {
+    // User has active subscription
+}
+
+if ($user->subscribed('default', 'PLN_basic')) {
+    // User has active subscription to basic plan
+}
+```
+
+---
+
+### subscribedToPlan()
+
+Determine if the model is actively subscribed to one of the given plans.
+
+```php
+public function subscribedToPlan(array|string $plans, string $subscription = 'default'): bool
+```
+
+<ParamField path="plans" type="array|string" required>
+  A plan code or array of plan codes to check
+</ParamField>
+
+<ParamField path="subscription" type="string" default="default">
+  The subscription type to check
+</ParamField>
+
+**Returns:** `bool`
+
+Returns `true` if the billable has a valid subscription to any of the specified plans.
+
+**Example:**
+```php
+if ($user->subscribedToPlan(['PLN_basic', 'PLN_premium'])) {
+    // User is on basic or premium plan
+}
+```
+
+---
+
+### onPlan()
+
+Determine if the entity is on the given plan.
+
+```php
+public function onPlan(string $plan): bool
+```
+
+<ParamField path="plan" type="string" required>
+  The Paystack plan code to check
+</ParamField>
+
+**Returns:** `bool`
+
+Returns `true` if the billable has any subscription (regardless of status) to the specified plan.
+
+**Example:**
+```php
+if ($user->onPlan('PLN_xxxxxxxxx')) {
+    // User has a subscription to this plan
+}
+```
+
+---
+
+### onTrial()
+
+Determine if the billable is on trial.
+
+```php
+public function onTrial(string $subscription = 'default', string $plan = null): bool
+```
+
+<ParamField path="subscription" type="string" default="default">
+  The subscription type to check
+</ParamField>
+
+<ParamField path="plan" type="string|null" default="null">
+  Optional plan code to verify the trial is for a specific plan
+</ParamField>
+
+**Returns:** `bool`
+
+Returns `true` if the billable is currently on a trial period. Checks both subscription-level trials and generic model-level trials.
+
+**Example:**
+```php
+if ($user->onTrial()) {
+    // User is on trial
+}
+
+if ($user->onTrial('default', 'PLN_premium')) {
+    // User is on trial for premium plan
+}
+```
+
+---
+
+### onGenericTrial()
+
+Determine if the billable is on a "generic" trial at the model level.
+
+```php
+public function onGenericTrial(): bool
+```
+
+**Returns:** `bool`
+
+Returns `true` if the billable's customer record has an active generic trial that hasn't expired.
+
+**Example:**
+```php
+if ($user->onGenericTrial()) {
+    // User has a generic trial active
+}
+```
+
+---
+
+### hasExpiredTrial()
+
+Determine if the billable's trial has ended.
+
+```php
+public function hasExpiredTrial(string $type = 'default', string $plan = null): bool
+```
+
+<ParamField path="type" type="string" default="default">
+  The subscription type to check
+</ParamField>
+
+<ParamField path="plan" type="string|null" default="null">
+  Optional plan code to verify the expired trial was for a specific plan
+</ParamField>
+
+**Returns:** `bool`
+
+Returns `true` if the trial period has expired. Checks both subscription-level and generic trials.
+
+**Example:**
+```php
+if ($user->hasExpiredTrial()) {
+    // Trial has expired
+}
+```
+
+---
+
+### hasExpiredGenericTrial()
+
+Determine if the billable's "generic" trial at the model level has expired.
+
+```php
+public function hasExpiredGenericTrial(): bool
+```
+
+**Returns:** `bool`
+
+Returns `true` if the generic trial period has ended.
+
+**Example:**
+```php
+if ($user->hasExpiredGenericTrial()) {
+    // Generic trial has expired
+}
+```
+
+---
+
+### trialEndsAt()
+
+Get the ending date of the trial.
+
+```php
+public function trialEndsAt(string $type = 'default'): ?Carbon
+```
+
+<ParamField path="type" type="string" default="default">
+  The subscription type to check
+</ParamField>
+
+**Returns:** `Carbon\Carbon|null`
+
+Returns the date when the trial ends, or `null` if not on trial.
+
+**Example:**
+```php
+$trialEnd = $user->trialEndsAt();
+if ($trialEnd) {
+    echo "Trial ends on: " . $trialEnd->format('Y-m-d');
+}
+```
+
+---
+
+### subscriptionPortalUrl()
+
+Get the customer portal URL for this billable.
+
+```php
+public function subscriptionPortalUrl(string $subscription = 'default'): string
+```
+
+<ParamField path="subscription" type="string" default="default">
+  The subscription type (currently not used in implementation)
+</ParamField>
+
+**Returns:** `string`
+
+Returns the Paystack-hosted URL where customers can manage their subscription.
+
+**Throws:** `InvalidCustomer` if the customer doesn't exist
+
+**Example:**
+```php
+$portalUrl = $user->subscriptionPortalUrl();
+```
+
+---
+
+### redirectToSubscriptionPortal()
+
+Generate a redirect response to the billable's customer portal.
+
+```php
+public function redirectToSubscriptionPortal(): RedirectResponse
+```
+
+**Returns:** `Illuminate\Http\RedirectResponse`
+
+Returns a redirect response to the subscription management portal.
+
+**Example:**
+```php
+Route::get('/billing-portal', function () {
+    return auth()->user()->redirectToSubscriptionPortal();
+});
+```
+
+## Source Location
+
+`src/Concerns/ManagesSubscriptions.php:1-193`

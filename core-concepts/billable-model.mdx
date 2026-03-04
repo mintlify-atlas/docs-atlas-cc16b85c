@@ -1,0 +1,214 @@
+---
+title: Billable Model
+description: Learn how to add the Billable trait to your models to enable subscription billing functionality
+---
+
+## Introduction
+
+The `Billable` trait is the foundation of Laravel Cashier Paystack. It provides various methods to perform common billing tasks such as creating subscriptions, managing customers, processing payments, and handling invoices.
+
+## Adding the Billable Trait
+
+To get started, add the `Billable` trait to your model definition. Typically, this will be your `User` model:
+
+```php
+use veekthoven\Cashier\Billable;
+
+class User extends Authenticatable
+{
+    use Billable;
+}
+```
+
+The trait automatically includes several concerns that organize billing functionality:
+
+- `ManagesCustomer` - Customer creation and management
+- `ManagesSubscriptions` - Subscription lifecycle methods
+- `ManagesPayments` - Single charges and refunds
+- `ManagesInvoices` - Invoice generation and retrieval
+- `ManagesCards` - Payment method management
+
+## Available Methods
+
+Once the `Billable` trait is added to your model, you'll have access to a comprehensive set of methods:
+
+### Customer Methods
+
+<CodeGroup>
+```php createAsCustomer()
+// Create a Paystack customer
+$user->createAsCustomer();
+
+// With additional options
+$user->createAsCustomer([
+    'first_name' => 'John',
+    'last_name' => 'Doe',
+]);
+```
+
+```php asPaystackCustomer()
+// Get the Paystack customer object
+$customer = $user->asPaystackCustomer();
+```
+
+```php paystackEmail()
+// Get the customer's email for Paystack
+$email = $user->paystackEmail();
+```
+</CodeGroup>
+
+### Subscription Methods
+
+<CodeGroup>
+```php newSubscription()
+// Begin creating a new subscription
+$user->newSubscription('default', 'PLN_gx2wn530m0i3w3m')
+    ->create($authToken);
+```
+
+```php subscription()
+// Get a subscription instance by type
+$subscription = $user->subscription('default');
+```
+
+```php subscribed()
+// Check if user has an active subscription
+if ($user->subscribed('default')) {
+    // User has an active subscription
+}
+```
+
+```php subscribedToPlan()
+// Check if subscribed to a specific plan
+if ($user->subscribedToPlan('PLN_gx2wn530m0i3w3m', 'default')) {
+    // User is subscribed to this plan
+}
+```
+
+```php onTrial()
+// Check if user is on trial
+if ($user->onTrial('default')) {
+    // User is within trial period
+}
+```
+</CodeGroup>
+
+### Payment Methods
+
+<CodeGroup>
+```php charge()
+// Make a one-off charge (amount in kobo)
+$response = $user->charge(10000);
+
+// With additional options
+$user->charge(10000, [
+    'authorization_code' => 'AUTH_xxx',
+]);
+```
+
+```php refund()
+// Refund a transaction
+$user->refund($transactionReference);
+```
+</CodeGroup>
+
+### Invoice Methods
+
+<CodeGroup>
+```php invoiceFor()
+// Create an invoice with immediate charge
+$user->invoiceFor('One Time Fee', 200000, [
+    'due_date' => now()->addDays(7),
+]);
+```
+
+```php invoices()
+// Get all invoices
+$invoices = $user->invoices();
+
+// Get only pending invoices
+$pending = $user->invoicesOnlyPending();
+
+// Get only paid invoices
+$paid = $user->invoicesOnlyPaid();
+```
+
+```php downloadInvoice()
+// Generate PDF download
+return $user->downloadInvoice($invoiceId, [
+    'vendor' => 'Your Company',
+    'product' => 'Your Product',
+]);
+```
+</CodeGroup>
+
+### Payment Method Management
+
+<CodeGroup>
+```php cards()
+// Get all card payment methods
+$cards = $user->cards();
+```
+
+```php deleteCards()
+// Delete all card authorizations
+$user->deleteCards();
+```
+</CodeGroup>
+
+## Customer Relationship
+
+The `Billable` trait establishes a polymorphic relationship with the `Customer` model:
+
+```php
+// Access the customer record
+$customer = $user->customer;
+
+// Customer properties
+$customer->paystack_id;      // Paystack customer ID
+$customer->paystack_code;    // Paystack customer code
+$customer->trial_ends_at;    // Generic trial end date
+```
+
+## Email Configuration
+
+By default, Cashier uses the `email` attribute on your model. You can customize this by overriding the `paystackEmail` method:
+
+```php
+public function paystackEmail(): ?string
+{
+    return $this->billing_email ?? $this->email;
+}
+```
+
+## Currency Preference
+
+The `preferredCurrency` method determines which currency to use for charges. It defaults to the application-wide currency set in your configuration:
+
+```php
+public function preferredCurrency()
+{
+    return 'NGN'; // or override for specific users
+}
+```
+
+<Note>
+The Billable trait uses morphOne and morphMany relationships, allowing you to use it on any model, not just the User model.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Customers" icon="users" href="/core-concepts/customers">
+    Learn how to create and manage Paystack customers
+  </Card>
+  <Card title="Subscriptions" icon="repeat" href="/core-concepts/subscriptions">
+    Create and manage recurring subscriptions
+  </Card>
+  <Card title="Payments" icon="credit-card" href="/core-concepts/payments">
+    Process single charges and refunds
+  </Card>
+  <Card title="Invoices" icon="file-invoice" href="/core-concepts/invoices">
+    Generate and manage invoices
+  </Card>
+</CardGroup>
