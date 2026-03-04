@@ -1,0 +1,111 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Laravel Cashier Paystack",
+  "projectDescription": "A Laravel package providing an expressive, fluent interface to Paystack's subscription billing services.",
+  "theme": "maple",
+  "primaryColor": "#00C3F7",
+  "lightColor": "#3DD5F3",
+  "darkColor": "#009FCC",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "configuration"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/billable-model",
+              "core-concepts/customers",
+              "core-concepts/subscriptions",
+              "core-concepts/payments",
+              "core-concepts/invoices"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/subscription-trials",
+              "guides/payment-methods",
+              "guides/webhooks",
+              "guides/single-charges",
+              "guides/currency-configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Traits",
+            "pages": [
+              "api-reference/billable-trait",
+              "api-reference/manages-subscriptions",
+              "api-reference/manages-payments",
+              "api-reference/manages-invoices",
+              "api-reference/manages-cards",
+              "api-reference/manages-customer"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api-reference/subscription",
+              "api-reference/customer",
+              "api-reference/invoice",
+              "api-reference/card"
+            ]
+          },
+          {
+            "group": "Classes",
+            "pages": [
+              "api-reference/subscription-builder",
+              "api-reference/paystack",
+              "api-reference/cashier"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api-reference/events"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Subscription management with Paystack",
+    "Payment method handling and card management",
+    "Invoice generation and PDF receipts",
+    "Webhook handling for Paystack events",
+    "Trial period support (with and without billing)",
+    "Single charges and refunds",
+    "Multi-currency support"
+  ],
+  "publicApiSurface": [
+    "Billable trait",
+    "newSubscription()",
+    "subscribed()",
+    "charge()",
+    "refund()",
+    "invoiceFor()",
+    "createAsCustomer()",
+    "cards()",
+    "subscription()",
+    "onTrial()",
+    "onGracePeriod()",
+    "cancel()",
+    "resume()",
+    "swap()",
+    "WebhookController"
+  ]
+}
